@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#151a21">
+<title>Daily Fresh</title>
+<style>
+  :root {
+    --bg: #151a21;
+    --bg-soft: #1b212a;
+    --card: #20272f;
+    --card-hover: #262e38;
+    --border: rgba(255, 255, 255, 0.07);
+    --text: #e8ecf2;
+    --text-dim: #9aa5b4;
+    --text-faint: #6b7686;
+    --accent: #4f8cff;
+    --accent-soft: rgba(79, 140, 255, 0.14);
+    --green: #4cd07d;
+    --danger: #ff6b6b;
+    --radius: 14px;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(900px 500px at 85% -10%, rgba(79, 140, 255, 0.08), transparent 60%),
+      radial-gradient(700px 400px at 0% 110%, rgba(76, 208, 125, 0.05), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 220px;
+    padding: 22px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-right: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.15);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .brand {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 6px 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .brand-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  .nav-group { display: flex; flex-direction: column; gap: 2px; }
+
+  .nav-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-faint);
+    padding: 14px 12px 6px;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .nav-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+
+  .nav-btn.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .nav-btn svg { flex-shrink: 0; }
+
+  .sidebar-foot { margin-top: auto; }
+
+  /* ---------- Main ---------- */
+  .main {
+    flex: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 44px 32px 80px;
+    width: 100%;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+  }
+
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+
+  .date {
+    margin-top: 4px;
+    font-size: 13.5px;
+    color: var(--text-faint);
+  }
+
+  .greeting {
+    margin-top: 6px;
+    font-size: 13.5px;
+    color: var(--text-faint);
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; }
+
+  .ring { width: 40px; height: 40px; transform: rotate(-90deg); }
+
+  .ring circle {
+    fill: none;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+  }
+
+  .ring-bg { stroke: var(--border); }
+
+  .ring-fg {
+    stroke: var(--accent);
+    transition: stroke-dashoffset 0.4s ease;
+  }
+
+  .ring-count { font-size: 12px; color: var(--text-dim); min-width: 30px; }
+
+  /* ---------- Views ---------- */
+  .view.hidden { display: none; }
+
+  .view-title { font-size: 20px; font-weight: 650; margin-bottom: 18px; }
+
+  /* ---------- Add row ---------- */
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 14px 4px 10px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .add-row:focus-within {
+    border-color: rgba(79, 140, 255, 0.45);
+    box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow);
+  }
+
+  .add-btn {
+    width: 34px; height: 34px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent);
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s, background 0.15s;
+  }
+
+  .add-btn:hover { background: #6ba0ff; transform: scale(1.05); }
+  .add-btn:active { transform: scale(0.95); }
+
+  #taskInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 15px;
+    padding: 11px 0;
+  }
+
+  #taskInput::placeholder { color: var(--text-faint); }
+
+  /* ---------- Carry over ---------- */
+  .carry {
+    margin-top: 18px;
+    background: var(--card);
+    border: 1px dashed rgba(79, 140, 255, 0.35);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .carry-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--accent-soft);
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .carry-header .carry-count {
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+
+  .carry-header .carry-all {
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .carry-header .carry-all:hover { background: rgba(255, 255, 255, 0.14); }
+
+  .carry-list { max-height: 240px; overflow-y: auto; }
+
+  .carry-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 16px;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+  }
+
+  .carry-item:hover { background: var(--card-hover); }
+
+  .carry-item:first-child { border-top: none; }
+
+  .carry-day {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  .carry-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Task list ---------- */
+  .task-list { list-style: none; margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+
+  .task {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 11px 12px;
+    animation: slide-in 0.25s ease both;
+    transition: background 0.15s, border-color 0.15s, opacity 0.25s;
+  }
+
+  .task:hover { background: var(--card-hover); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .task.leaving { opacity: 0; transform: scale(0.97); }
+
+  .check {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    border: 2px solid var(--text-faint);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  }
+
+  .check:hover { border-color: var(--accent); transform: scale(1.08); }
+  .check:active { transform: scale(0.9); }
+
+  .check svg {
+    width: 12px; height: 12px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .check svg path {
+    fill: none;
+    stroke: white;
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 24;
+    stroke-dashoffset: 24;
+    transition: stroke-dashoffset 0.25s ease 0.05s;
+  }
+
+  .task.done .check {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  .task.done .check svg { opacity: 1; }
+  .task.done .check svg path { stroke-dashoffset: 0; }
+
+  .task-text {
+    flex: 1;
+    font-size: 15px;
+    line-height: 1.35;
+    word-break: break-word;
+    transition: color 0.2s, opacity 0.2s;
+  }
+
+  .task.done .task-text {
+    color: var(--text-dim);
+    opacity: 0.55;
+    text-decoration: line-through;
+    text-decoration-color: rgba(154, 165, 180, 0.5);
+  }
+
+  .carried-tag {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 2px 7px;
+  }
+
+  .task-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .task:hover .task-actions, .task:focus-within .task-actions { opacity: 1; }
+
+  .icon-btn {
+    width: 28px; height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .icon-btn.del:hover { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+
+  .task-edit-input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(79, 140, 255, 0.5);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 6px 10px;
+    outline: none;
+  }
+
+  /* ---------- Empty state ---------- */
+  .empty {
+    margin-top: 60px;
+    text-align: center;
+    color: var(--text-faint);
+  }
+
+  .empty-icon {
+    width: 64px; height: 64px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 22px;
+  }
+
+  .empty h3 { color: var(--text-dim); font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .empty p { font-size: 13.5px; }
+
+  /* ---------- Completed section ---------- */
+  .done-wrap { margin-top: 26px; }
+
+  .done-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--border);
+    padding: 14px 2px 0;
+    color: var(--text-faint);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .done-toggle:hover { color: var(--text-dim); }
+
+  .chevron { transition: transform 0.2s; font-size: 10px; }
+  .done-toggle.open .chevron { transform: rotate(90deg); }
+
+  .done-list .task { opacity: 0.75; animation: none; }
+
+  /* ---------- History ---------- */
+  .day-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .day-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .day-name { font-size: 14.5px; font-weight: 650; }
+
+  .day-stats { font-size: 12px; color: var(--text-faint); }
+
+  .day-stats.done-full { color: var(--green); }
+
+  .del-day {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+
+  .day-card:hover .del-day { opacity: 1; }
+  .del-day:hover { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+
+  .day-card ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+  .day-card li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    padding: 4px 2px;
+    color: var(--text-dim);
+  }
+
+  .day-card li .tick {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .day-card li .tick svg { width: 9px; height: 9px; }
+
+  .day-card li .tick svg path {
+    fill: none;
+    stroke: var(--green);
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .day-card li.done .tick { border-color: var(--green); background: var(--green); }
+  .day-card li.done .tick svg path { stroke: white; }
+  .day-card li.done { opacity: 0.5; text-decoration: line-through; }
+
+  .day-card li .carried { font-size: 10px; color: var(--text-faint); }
+
+  .day-card .subhead { font-size: 11px; color: var(--text-faint); margin: 10px 0 4px; }
+
+  /* ---------- Settings ---------- */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+
+  .setting-row label { font-size: 14.5px; font-weight: 550; }
+
+  select {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 9px 34px 9px 14px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa5b4' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+
+  select:focus { border-color: rgba(79, 140, 255, 0.5); }
+
+  .hint {
+    font-size: 13px;
+    color: var(--text-faint);
+    line-height: 1.5;
+    margin: 4px 2px 22px;
+  }
+
+  .danger-btn {
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.35);
+    color: var(--danger);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .danger-btn:hover { background: rgba(255, 107, 107, 0.18); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    font-size: 13.5px;
+    font-weight: 550;
+    padding: 11px 20px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 100;
+    white-space: nowrap;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Mobile ---------- */
+  .menu-btn { display: none; }
+
+  @media (max-width: 720px) {
+    .app { flex-direction: column; }
+
+    .sidebar {
+      width: 100%;
+      height: auto;
+      position: static;
+      flex-direction: row;
+      align-items: center;
+      padding: 10px 16px;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+
+    .brand { padding: 0 8px 0 0; font-size: 15px; }
+    .brand-dot { width: 8px; height: 8px; }
+
+    .nav-group { flex-direction: row; margin-left: auto; gap: 4px; }
+    .nav-label, .sidebar-foot { display: none; }
+
+    .nav-btn {
+      width: auto;
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 9px;
+    }
+
+    .main { padding: 26px 18px 70px; }
+
+    h1 { font-size: 23px; }
+
+    .ring { width: 34px; height: 34px; }
+
+    .task-actions { opacity: 1; }
+    .del-day { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-dot"></span>Daily Fresh</div>
+    <div class="nav-group">
+      <button class="nav-btn active" data-view="today" id="navToday">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        Today
+      </button>
+      <button class="nav-btn" data-view="history" id="navHistory">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13a9 9 0 1 0 2.5-7.3L3 8"/></svg>
+        History
+      </button>
+    </div>
+    <div class="nav-group sidebar-foot">
+      <button class="nav-btn" data-view="settings" id="navSettings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="dayTitle">Today</h1>
+        <p class="date" id="dayDate"></p>
+        <p class="greeting" id="greeting"></p>
+      </div>
+      <div class="progress" id="progressWrap">
+        <svg class="ring" viewBox="0 0 36 36">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+          <circle class="ring-fg" cx="18" cy="18" r="15.9" stroke-dasharray="100" stroke-dashoffset="100"/>
+        </svg>
+        <span class="ring-count" id="ringCount"></span>
+      </div>
+    </header>
+
+    <section class="view" id="todayView">
+      <div class="add-row">
+        <button class="add-btn" id="addBtn" title="Add task">+</button>
+        <input id="taskInput" type="text" placeholder="Add a task, press Enter" autocomplete="off">
+      </div>
+
+      <div class="carry hidden" id="carryWrap">
+        <div class="carry-header" id="carryToggle">
+          Unfinished from previous days
+          <span class="carry-count" id="carryCount"></span>
+          <button class="carry-all" id="carryAll">Bring all</button>
+        </div>
+        <div class="carry-list" id="carryList"></div>
+      </div>
+
+      <ul class="task-list" id="taskList"></ul>
+
+      <div class="empty" id="emptyToday">
+        <div class="empty-icon">+</div>
+        <h3>A blank page</h3>
+        <p>Start fresh. Add what matters today.</p>
+      </div>
+
+      <div class="done-wrap hidden" id="doneWrap">
+        <button class="done-toggle" id="doneToggle">
+          <span class="chevron">&#9654;</span>
+          Completed <span id="doneCount"></span>
+        </button>
+        <ul class="task-list done-list" id="doneList"></ul>
+      </div>
+    </section>
+
+    <section class="view hidden" id="historyView">
+      <h2 class="view-title">History</h2>
+      <div id="historyList"></div>
+      <div class="empty" id="emptyHistory">
+        <div class="empty-icon">+</div>
+        <h3>No history yet</h3>
+        <p>Past days will appear here. Nothing is ever lost.</p>
+      </div>
+    </section>
+
+    <section class="view hidden" id="settingsView">
+      <h2 class="view-title">Settings</h2>
+      <div class="setting-row">
+        <label for="resetHour">New day starts at</label>
+        <select id="resetHour"></select>
+      </div>
+      <p class="hint">
+        At this hour your page resets to a fresh, empty page. Unfinished tasks are
+        not deleted — they move to History and can be carried over to a new day.
+      </p>
+      <div class="setting-row">
+        <label>Data</label>
+        <button class="danger-btn" id="resetDataBtn">Erase everything</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'daily-fresh-state';
+  var DEFAULT_STATE = { settings: { resetHour: 0 }, days: {} };
+
+  var state = load();
+  var activeDay = state.activeDay || currentDayKey();
+  var currentView = 'today';
+  var doneOpen = false;
+  var carryOpen = true;
+  var toastTimer = null;
+
+  /* ---------- Storage ---------- */
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+      var parsed = JSON.parse(raw);
+      if (!parsed.settings) parsed.settings = { resetHour: 0 };
+      if (!parsed.days) parsed.days = {};
+      return parsed;
+    } catch (e) {
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {}
+  }
+
+  /* ---------- Day logic ---------- */
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function currentDayKey() {
+    var now = new Date();
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (now.getHours() < state.settings.resetHour) {
+      d.setDate(d.getDate() - 1);
+    }
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function dayLabel(key) {
+    var parts = key.split('-');
+    var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    var today = new Date();
+    var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var diff = Math.round((todayStart - d) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    if (diff > 1 && diff < 7) return diff + ' days ago';
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function fullDateLabel(key) {
+    var parts = key.split('-');
+    var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function isFirstDay() {
+    return Object.keys(state.days).length <= 1;
+  }
+
+  function ensureDay(silent) {
+    var key = currentDayKey();
+    if (activeDay === key) return;
+    activeDay = key;
+    state.activeDay = key;
+    if (!state.days[key]) state.days[key] = [];
+    save();
+    if (!silent) {
+      var msg = isFirstDay() ? 'Welcome — your page is fresh' : 'A new day has begun';
+      toast(msg);
+      if (!isFirstDay()) confettiBurst();
+    }
+    render();
+  }
+
+  /* ---------- Tasks ---------- */
+
+  function todayTasks() {
+    if (!state.days[activeDay]) state.days[activeDay] = [];
+    return state.days[activeDay];
+  }
+
+  function addTask(text) {
+    var t = text.trim();
+    if (!t) return;
+    todayTasks().push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      text: t,
+      done: false,
+      carriedFrom: null,
+      created: new Date().toISOString()
+    });
+    save();
+    render();
+    toast('Task added');
+  }
+
+  function removeTask(id) {
+    var tasks = todayTasks();
+    var idx = tasks.findIndex(function (t) { return t.id === id; });
+    if (idx === -1) return;
+    tasks.splice(idx, 1);
+    save();
+    render();
+  }
+
+  function toggleTask(id) {
+    var tasks = todayTasks();
+    var idx = tasks.findIndex(function (t) { return t.id === id; });
+    if (idx === -1) return;
+    tasks[idx].done = !tasks[idx].done;
+    save();
+    render();
+    if (tasks[idx].done && allDone()) {
+      toast('All done — enjoy your day');
+    }
+  }
+
+  function editTask(id, text) {
+    var tasks = todayTasks();
+    var idx = tasks.findIndex(function (t) { return t.id === id; });
+    if (idx === -1) return;
+    tasks[idx].text = text.trim();
+    save();
+    render();
+  }
+
+  function allDone() {
+    var tasks = todayTasks();
+    return tasks.length > 0 && tasks.every(function (t) { return t.done; });
+  }
+
+  /* ---------- Carry over ---------- */
+
+  function carryCandidates() {
+    var today = todayTasks();
+    var carried = {};
+    today.forEach(function (t) {
+      if (t.carriedFrom) carried[t.carriedFrom.day + ':' + t.carriedFrom.id] = true;
+    });
+    var keys = Object.keys(state.days)
+      .filter(function (k) { return k < activeDay; })
+      .sort()
+      .reverse();
+    var res = [];
+    keys.forEach(function (k) {
+      state.days[k].forEach(function (t) {
+        if (!t.done && !carried[k + ':' + t.id]) {
+          res.push({ day: k, task: t });
+        }
+      });
+    });
+    return res;
+  }
+
+  function carryTask(dayKey, task) {
+    todayTasks().push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      text: task.text,
+      done: false,
+      carriedFrom: { day: dayKey, id: task.id },
+      created: new Date().toISOString()
+    });
+    save();
+    render();
+    toast('Added to today');
+  }
+
+  function carryAll() {
+    var candidates = carryCandidates();
+    if (!candidates.length) return;
+    candidates.forEach(function (c) { carryTask(c.day, c.task); });
+    toast(candidates.length + (candidates.length === 1 ? ' task' : ' tasks') + ' brought to today');
+  }
+
+  /* ---------- Rendering ---------- */
+
+  var els = {
+    dayTitle: document.getElementById('dayTitle'),
+    dayDate: document.getElementById('dayDate'),
+    greeting: document.getElementById('greeting'),
+    ringFg: document.querySelector('.ring-fg'),
+    ringCount: document.getElementById('ringCount'),
+    taskInput: document.getElementById('taskInput'),
+    taskList: document.getElementById('taskList'),
+    doneList: document.getElementById('doneList'),
+    doneWrap: document.getElementById('doneWrap'),
+    doneToggle: document.getElementById('doneToggle'),
+    doneCount: document.getElementById('doneCount'),
+    emptyToday: document.getElementById('emptyToday'),
+    carryWrap: document.getElementById('carryWrap'),
+    carryCount: document.getElementById('carryCount'),
+    carryList: document.getElementById('carryList'),
+    historyList: document.getElementById('historyList'),
+    emptyHistory: document.getElementById('emptyHistory'),
+    resetHour: document.getElementById('resetHour')
+  };
+
+  function checkSvg() {
+    return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  }
+
+  function taskHtml(t) {
+    var carriedTag = t.carriedFrom ? '<span class="carried-tag">carried</span>' : '';
+    var actions =
+      '<div class="task-actions">' +
+      '<button class="icon-btn edit" data-edit="' + t.id + '" title="Edit" aria-label="Edit task">' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>' +
+      '</button>' +
+      '<button class="icon-btn del" data-del="' + t.id + '" title="Delete" aria-label="Delete task">' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+      '</button>' +
+      '</div>';
+    return (
+      '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
+      '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
+      '<span class="task-text">' + escapeHtml(t.text) + '</span>' +
+      carriedTag +
+      actions +
+      '</li>'
+    );
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function render() {
+    renderToday();
+    renderHistory();
+    renderSettings();
+    renderNavBadges();
+  }
+
+  function renderToday() {
+    var tasks = todayTasks();
+    var open = tasks.filter(function (t) { return !t.done; });
+    var done = tasks.filter(function (t) { return t.done; });
+
+    var dateKey = currentDayKey();
+    els.dayTitle.textContent = dayLabel(dateKey) === 'Today' ? 'Today' : 'My Day';
+    els.dayDate.textContent = fullDateLabel(dateKey);
+    els.greeting.textContent = greetingText();
+    els.greeting.style.display = isFirstDay() ? 'none' : '';
+
+    els.taskList.innerHTML = open.map(taskHtml).join('');
+
+    els.doneList.innerHTML = done.map(taskHtml).join('');
+    els.doneCount.textContent = done.length ? '· ' + done.length : '';
+    var hasDone = done.length > 0;
+    els.doneWrap.classList.toggle('hidden', !hasDone);
+    if (!hasDone) doneOpen = false;
+    els.doneToggle.classList.toggle('open', doneOpen);
+    els.doneList.classList.toggle('hidden', !doneOpen);
+
+    els.emptyToday.style.display = tasks.length ? 'none' : '';
+
+    var total = tasks.length;
+    var pct = total ? Math.round((done.length / total) * 100) : 0;
+    els.ringFg.style.strokeDashoffset = (100 - pct).toFixed(1);
+    els.ringCount.textContent = done.length + '/' + total;
+
+    renderCarry();
+  }
+
+  function greetingText() {
+    var h = new Date().getHours();
+    if (h < 5) return 'Still night — or already morning?';
+    if (h < 12) return 'Good morning — fresh page, fresh mind';
+    if (h < 18) return 'Good afternoon — what matters now?';
+    return 'Good evening — settle today';
+  }
+
+  function renderCarry() {
+    var candidates = carryCandidates();
+    els.carryWrap.classList.toggle('hidden', candidates.length === 0);
+    if (!candidates.length) return;
+    els.carryCount.textContent = candidates.length;
+    els.carryList.innerHTML = candidates.map(function (c) {
+      return (
+        '<button class="carry-item" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '">' +
+        '<span class="carry-day">' + dayLabel(c.day) + '</span>' +
+        '<span class="carry-text">' + escapeHtml(c.task.text) + '</span>' +
+        '</button>'
+      );
+    }).join('');
+    els.carryList.style.display = carryOpen ? '' : 'none';
+    els.carryToggle.classList.toggle('open', carryOpen);
+  }
+
+  function renderHistory() {
+    var keys = Object.keys(state.days)
+      .filter(function (k) { return k !== activeDay && state.days[k].length > 0; })
+      .sort()
+      .reverse();
+    els.historyList.innerHTML = keys.map(dayCardHtml).join('');
+    els.emptyHistory.style.display = keys.length ? 'none' : '';
+  }
+
+  function dayCardHtml(k) {
+    var tasks = state.days[k];
+    var done = tasks.filter(function (t) { return t.done; });
+    var statsCls = tasks.length && done.length === tasks.length ? 'done-full' : '';
+    var lis = tasks.map(function (t) {
+      var carried = t.carriedFrom ? '<span class="carried">· carried</span>' : '';
+      return (
+        '<li class="' + (t.done ? 'done' : '') + '">' +
+        '<span class="tick">' + checkSvg() + '</span>' +
+        '<span>' + escapeHtml(t.text) + '</span>' +
+        carried +
+        '</li>'
+      );
+    }).join('');
+    return (
+      '<div class="day-card">' +
+      '<div class="day-card-head">' +
+      '<span class="day-name">' + fullDateLabel(k) + '</span>' +
+      '<span class="day-stats ' + statsCls + '">' + done.length + ' of ' + tasks.length + ' done</span>' +
+      '<button class="del-day" data-del-day="' + k + '" title="Delete this day">Delete</button>' +
+      '</div>' +
+      '<ul>' + lis + '</ul>' +
+      '</div>'
+    );
+  }
+
+  function renderSettings() {
+    var sel = els.resetHour;
+    if (sel.options.length === 0) {
+      for (var h = 0; h < 24; h++) {
+        var opt = document.createElement('option');
+        opt.value = h;
+        var hour12 = h % 12 === 0 ? 12 : h % 12;
+        var ampm = h < 12 ? 'AM' : 'PM';
+        opt.textContent = hour12 + ':00 ' + ampm;
+        sel.appendChild(opt);
+      }
+    }
+    sel.value = String(state.settings.resetHour);
+  }
+
+  function renderNavBadges() {
+    var candidates = carryCandidates().length;
+    document.querySelectorAll('.nav-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.view === currentView);
+    });
+    var badge = document.getElementById('navToday').querySelector('.nav-count');
+    if (candidates && currentView === 'today') {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'carry-count';
+        document.getElementById('navToday').appendChild(badge);
+      }
+      badge.textContent = candidates;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  /* ---------- Toast ---------- */
+
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
+  }
+
+  /* ---------- Confetti ---------- */
+
+  function confettiBurst() {
+    var colors = ['#4f8cff', '#4cd07d', '#ffd166', '#ff6b9d', '#9b7bff'];
+    for (var i = 0; i < 40; i++) {
+      (function (i) {
+        var p = document.createElement('div');
+        p.style.cssText =
+          'position:fixed;z-index:200;width:8px;height:8px;border-radius:2px;' +
+          'background:' + colors[i % colors.length] + ';' +
+          'left:' + (30 + Math.random() * 40) + 'vw;' +
+          'top:-10px;pointer-events:none;';
+        document.body.appendChild(p);
+        var dx = (Math.random() - 0.5) * 140;
+        var rot = (Math.random() - 0.5) * 720;
+        p.animate(
+          [
+            { transform: 'translate(0,0) rotate(0)', opacity: 1 },
+            { transform: 'translate(' + dx + 'px,' + (window.innerHeight * 0.7 + Math.random() * 100) + 'px) rotate(' + rot + 'deg)', opacity: 0 }
+          ],
+          { duration: 1600 + Math.random() * 900, easing: 'cubic-bezier(0.2,0.6,0.4,1)' }
+        ).onfinish = function () { p.remove(); };
+      })(i);
+    }
+  }
+
+  /* ---------- View switching ---------- */
+
+  function switchView(view) {
+    currentView = view;
+    document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
+    document.getElementById(view + 'View').classList.remove('hidden');
+    renderNavBadges();
+    if (view === 'today') els.taskInput.focus();
+  }
+
+  /* ---------- Events ---------- */
+
+  document.querySelectorAll('.nav-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { switchView(btn.dataset.view); });
+  });
+
+  function addCurrentTask() {
+    var text = els.taskInput.value;
+    if (!text.trim()) { els.taskInput.focus(); return; }
+    addTask(text);
+    els.taskInput.value = '';
+    els.taskInput.focus();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', addCurrentTask);
+  els.taskInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addCurrentTask();
+  });
+
+  els.taskList.addEventListener('click', onTaskClick);
+  els.doneList.addEventListener('click', onTaskClick);
+
+  function onTaskClick(e) {
+    var check = e.target.closest('[data-check]');
+    if (check) { toggleTask(check.dataset.check); return; }
+    var del = e.target.closest('[data-del]');
+    if (del) { removeTask(del.dataset.del); return; }
+    var edit = e.target.closest('[data-edit]');
+    if (edit) { startEdit(edit.dataset.edit); }
+  }
+
+  function startEdit(id) {
+    var li = els.taskList.querySelector('[data-id="' + id + '"]');
+    if (!li) return;
+    var textEl = li.querySelector('.task-text');
+    var old = textEl.textContent;
+    var input = document.createElement('input');
+    input.className = 'task-edit-input';
+    input.value = old;
+    textEl.replaceWith(input);
+    li.querySelector('.task-actions').style.display = 'none';
+    input.focus();
+    input.select();
+    var done = function (commit) {
+      if (commit && input.value.trim()) editTask(id, input.value);
+      render();
+    };
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') done(true);
+      if (e.key === 'Escape') done(false);
+    });
+    input.addEventListener('blur', function () { done(true); });
+  }
+
+  els.carryToggle.addEventListener('click', function () {
+    carryOpen = !carryOpen;
+    els.carryList.style.display = carryOpen ? '' : 'none';
+    els.carryToggle.classList.toggle('open', carryOpen);
+  });
+
+  els.carryList.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-carry]');
+    if (!btn) return;
+    var dayKey = btn.dataset.carry;
+    var task = (state.days[dayKey] || []).find(function (t) { return t.id === btn.dataset.carryId; });
+    if (task) carryTask(dayKey, task);
+  });
+
+  document.getElementById('carryAll').addEventListener('click', function (e) {
+    e.stopPropagation();
+    carryAll();
+  });
+
+  els.doneToggle.addEventListener('click', function () {
+    doneOpen = !doneOpen;
+    els.doneToggle.classList.toggle('open', doneOpen);
+    els.doneList.classList.toggle('hidden', !doneOpen);
+  });
+
+  els.historyList.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-del-day]');
+    if (!btn) return;
+    if (confirm('Delete this day from history? This cannot be undone.')) {
+      delete state.days[btn.dataset.delDay];
+      save();
+      render();
+      toast('Day deleted');
+    }
+  });
+
+  els.resetHour.addEventListener('change', function () {
+    state.settings.resetHour = +els.resetHour.value;
+    save();
+    ensureDay(true);
+    toast('New day starts at ' + els.resetHour.options[els.resetHour.selectedIndex].textContent);
+  });
+
+  document.getElementById('resetDataBtn').addEventListener('click', function () {
+    if (!confirm('Erase all tasks and history? This cannot be undone.')) return;
+    state = { settings: { resetHour: +els.resetHour.value }, days: {} };
+    activeDay = currentDayKey();
+    state.activeDay = activeDay;
+    state.days[activeDay] = [];
+    save();
+    render();
+    toast('Everything erased — a fresh start');
+  });
+
+  /* ---------- Rollover polling ---------- */
+
+  function checkRollover() {
+    var key = currentDayKey();
+    if (key !== activeDay) ensureDay();
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) checkRollover();
+  });
+
+  setInterval(checkRollover, 30000);
+
+  /* ---------- Boot ---------- */
+
+  ensureDay(true);
+  render();
+  switchView('today');
+  els.taskInput.focus();
+})();
+</script>
+</body>
+</html>
