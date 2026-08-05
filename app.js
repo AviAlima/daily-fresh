@@ -972,30 +972,55 @@
   /* ================= Drag & drop (pointer-based, mouse + touch) ================= */
 
   var dragState = null;
+  var pressTimer = null;
+  var pressOrigin = null;
+  var suppressClick = false;
+
+  function beginDrag(li, e) {
+    clearTimeout(pressTimer);
+    pressOrigin = null;
+    dragState = { id: li.dataset.id, el: li, startY: e.clientY, moved: false };
+    li.classList.add('dragging');
+    li.style.touchAction = 'none';
+    try { li.setPointerCapture(e.pointerId); } catch (err) {}
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
 
   els.taskList.addEventListener('pointerdown', function (e) {
+    suppressClick = false;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    var li = e.target.closest('.task');
+    if (!li || li.classList.contains('done')) return;
     var handle = e.target.closest('.drag-handle');
-    if (!handle) return;
-    var li = handle.closest('.task');
-    if (!li) return;
-    e.preventDefault();
-    try { li.setPointerCapture(e.pointerId); } catch (err) {}
-    dragState = {
-      id: li.dataset.id,
-      el: li,
-      startY: e.clientY,
-      moved: false
-    };
+
+    if (handle) {
+      beginDrag(li, e);
+      return;
+    }
+    if (e.pointerType === 'mouse') return;
+
+    pressOrigin = { x: e.clientX, y: e.clientY };
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(function () {
+      beginDrag(li, e);
+    }, 300);
   });
 
-  els.taskList.addEventListener('pointermove', function (e) {
-    if (!dragState) return;
+  function dragMove(e) {
+    if (!dragState) {
+      if (pressOrigin) {
+        if (Math.abs(e.clientX - pressOrigin.x) > 10 || Math.abs(e.clientY - pressOrigin.y) > 10) {
+          clearTimeout(pressTimer);
+          pressOrigin = null;
+        }
+      }
+      return;
+    }
     var dy = e.clientY - dragState.startY;
     if (!dragState.moved && Math.abs(dy) < 6) return;
     dragState.moved = true;
 
     var dragged = dragState.el;
-    dragged.classList.add('dragging');
     dragged.style.transition = 'none';
     dragged.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
     dragged.style.zIndex = '20';
@@ -1019,12 +1044,15 @@
     if (!inserted && els.taskList.lastElementChild !== dragged) {
       els.taskList.appendChild(dragged);
     }
-  });
+  }
 
   function endDrag(commit) {
+    clearTimeout(pressTimer);
+    pressOrigin = null;
     if (!dragState) return;
     var dragged = dragState.el;
     dragged.classList.remove('dragging');
+    dragged.style.touchAction = '';
     dragged.style.transition = 'transform 0.18s ease';
     dragged.style.transform = '';
     dragged.style.zIndex = '';
@@ -1034,13 +1062,24 @@
       var tasks = today().tasks;
       tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
       save();
+      suppressClick = true;
     }
     dragState = null;
     renderToday();
   }
 
-  els.taskList.addEventListener('pointerup', function () { endDrag(true); });
-  els.taskList.addEventListener('pointercancel', function () { endDrag(false); });
+  els.taskList.addEventListener('pointermove', dragMove);
+  window.addEventListener('pointermove', dragMove);
+  window.addEventListener('pointerup', function () { endDrag(true); });
+  window.addEventListener('pointercancel', function () { endDrag(false); });
+
+  els.taskList.addEventListener('click', function (e) {
+    if (suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClick = false;
+    }
+  }, true);
 
   els.taskList.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
