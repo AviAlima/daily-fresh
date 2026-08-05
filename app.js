@@ -372,6 +372,8 @@
       resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.setAttribute('data-theme', resolved);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', resolved === 'dark' ? '#151a21' : '#f4f5f8');
   }
 
   if (window.matchMedia) {
@@ -1220,6 +1222,61 @@
     if (isTyping(e.target)) bringFocusedIntoView(e.target);
   });
 
+  /* ================= PWA ================= */
+
+  var deferredPrompt = null;
+
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+           !!window.navigator.standalone;
+  }
+
+  function isIOS() {
+    var ua = navigator.userAgent;
+    return /iphone|ipod/i.test(ua) || (/ipad|macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  }
+
+  function updateInstallRow() {
+    var row = $('installRow');
+    if (!row) return;
+    if (isStandalone() || deferredPrompt === false) {
+      row.classList.add('hidden');
+      return;
+    }
+    row.classList.remove('hidden');
+    if (isIOS()) {
+      var btn = $('installBtn');
+      btn.textContent = 'How to';
+      btn.dataset.ios = '1';
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    updateInstallRow();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    updateInstallRow();
+    toast('App installed — welcome to the home screen');
+  });
+
+  $('installBtn').addEventListener('click', function () {
+    if (deferredPrompt && deferredPrompt.prompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function () {
+        deferredPrompt = null;
+        updateInstallRow();
+      });
+    } else if ($('installBtn').dataset.ios) {
+      toast('In Safari: tap Share \u2192 Add to Home Screen');
+    } else {
+      toast('Use your browser\u2019s menu \u2192 Install app');
+    }
+  });
+
   /* ================= Clock & rollover ================= */
 
   function tick() {
@@ -1238,10 +1295,17 @@
 
   /* ================= Boot ================= */
 
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+
   applyTheme();
   ensureDay(true);
   render();
   switchView('today');
+  updateInstallRow();
   if (!state.onboarded) openOnboarding();
   else els.taskInput.focus();
   tick();

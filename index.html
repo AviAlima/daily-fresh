@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#151a21">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily Fresh">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Daily Fresh</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -219,6 +226,14 @@
           <input type="checkbox" id="soundToggle" checked>
           <span class="slider"></span>
         </label>
+      </div>
+
+      <div class="setting-row hidden" id="installRow">
+        <div class="setting-label">
+          <span>Install app</span>
+          <span class="setting-sub">Add Daily Fresh to your home screen</span>
+        </div>
+        <button class="timer-btn primary" id="installBtn">Install</button>
       </div>
 
       <div class="setting-row">

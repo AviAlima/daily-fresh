@@ -14,6 +14,15 @@ A calm, Microsoft To Do-inspired daily task app. Every day starts with a fresh, 
 
 Pure static HTML/CSS/JS, zero dependencies. Data is stored in your browser's localStorage.
 
+## Install as an app (PWA)
+
+Daily Fresh is a Progressive Web App — it can be installed on your phone or desktop and run full-screen like a native app, even offline:
+
+- **Android / Chrome desktop**: open Settings → *Install app*, or use the browser's *Install app* prompt
+- **iPhone / iPad**: open the site in Safari, tap **Share** → **Add to Home Screen**
+
+Your tasks are stored in the browser, so the app works offline once installed.
+
 ## Run locally
 
 ```bash
