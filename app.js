@@ -31,7 +31,6 @@
   var doneOpen = false;
   var carryOpen = true;
   var openNoteId = null;
-  var dragId = null;
   var toastTimer = null;
   var noteSaveTimer = null;
   var calView = currentMonth();
@@ -442,7 +441,7 @@
         '</div>';
     }
     return (
-      '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '" draggable="' + (isToday && !t.done) + '">' +
+      '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
       '<span class="drag-handle" title="Drag to reorder"><i></i><i></i><i></i></span>' +
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
       priorityDot +
@@ -968,42 +967,80 @@
     toast('Everything erased — a fresh start');
   });
 
-  /* ================= Drag & drop ================= */
+  /* ================= Drag & drop (pointer-based, mouse + touch) ================= */
 
-  els.taskList.addEventListener('dragstart', function (e) {
-    var li = e.target.closest('.task');
-    if (!li || li.querySelector('.task-note-input')) return;
-    dragId = li.dataset.id;
-    li.classList.add('dragging');
-    els.taskList.classList.add('dragging-list');
-    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); } catch (err) {}
-  });
+  var dragState = null;
 
-  els.taskList.addEventListener('dragover', function (e) {
+  els.taskList.addEventListener('pointerdown', function (e) {
+    var handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    var li = handle.closest('.task');
+    if (!li) return;
     e.preventDefault();
-    if (!dragId) return;
-    e.dataTransfer.dropEffect = 'move';
-    var li = e.target.closest('.task');
-    if (!li || li.dataset.id === dragId) return;
-    var rect = li.getBoundingClientRect();
-    var before = e.clientY < rect.top + rect.height / 2;
-    var tasks = today().tasks;
-    var fromIdx = tasks.findIndex(function (t) { return t.id === dragId; });
-    var toIdx = tasks.findIndex(function (t) { return t.id === li.dataset.id; });
-    if (fromIdx === -1 || toIdx === -1) return;
-    tasks.splice(fromIdx, 1);
-    toIdx = tasks.findIndex(function (t) { return t.id === li.dataset.id; });
-    if (!before) toIdx++;
-    tasks.splice(Math.max(0, toIdx), 0, tasks.splice(fromIdx < toIdx ? fromIdx : fromIdx, 1)[0]);
-    save();
-    renderToday();
+    try { li.setPointerCapture(e.pointerId); } catch (err) {}
+    dragState = {
+      id: li.dataset.id,
+      el: li,
+      startY: e.clientY,
+      moved: false
+    };
   });
 
-  els.taskList.addEventListener('dragend', function () {
-    dragId = null;
-    els.taskList.classList.remove('dragging-list');
-    renderToday();
+  els.taskList.addEventListener('pointermove', function (e) {
+    if (!dragState) return;
+    var dy = e.clientY - dragState.startY;
+    if (!dragState.moved && Math.abs(dy) < 6) return;
+    dragState.moved = true;
+
+    var dragged = dragState.el;
+    dragged.classList.add('dragging');
+    dragged.style.transition = 'none';
+    dragged.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
+    dragged.style.zIndex = '20';
+    dragged.style.position = 'relative';
+
+    var rect = dragged.getBoundingClientRect();
+    var midY = rect.top + rect.height / 2;
+    var targets = els.taskList.querySelectorAll('.task');
+    var inserted = false;
+    for (var i = 0; i < targets.length; i++) {
+      if (targets[i] === dragged) continue;
+      var tr = targets[i].getBoundingClientRect();
+      if (midY < tr.top + tr.height / 2) {
+        if (targets[i].previousElementSibling !== dragged) {
+          els.taskList.insertBefore(dragged, targets[i]);
+        }
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted && els.taskList.lastElementChild !== dragged) {
+      els.taskList.appendChild(dragged);
+    }
   });
+
+  function endDrag(commit) {
+    if (!dragState) return;
+    var dragged = dragState.el;
+    dragged.classList.remove('dragging');
+    dragged.style.transition = 'transform 0.18s ease';
+    dragged.style.transform = '';
+    dragged.style.zIndex = '';
+    if (commit && dragState.moved) {
+      var order = [];
+      els.taskList.querySelectorAll('.task').forEach(function (li) { order.push(li.dataset.id); });
+      var tasks = today().tasks;
+      tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
+      save();
+    }
+    dragState = null;
+    renderToday();
+  }
+
+  els.taskList.addEventListener('pointerup', function () { endDrag(true); });
+  els.taskList.addEventListener('pointercancel', function () { endDrag(false); });
+
+  els.taskList.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
   /* ================= Focus timer ================= */
 

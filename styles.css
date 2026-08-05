@@ -470,11 +470,17 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   padding: 11px 12px;
   animation: slide-in 0.25s ease both;
   transition: background 0.15s, border-color 0.15s, opacity 0.25s, transform 0.15s;
+  position: relative;
 }
 
 .task:hover { background: var(--card-hover); border-color: rgba(79, 140, 255, 0.18); }
 
-.task.dragging { opacity: 0.4; }
+.task.dragging {
+  opacity: 0.55;
+  box-shadow: var(--shadow);
+  border-color: rgba(79, 140, 255, 0.45);
+  background: var(--card-hover);
+}
 
 @keyframes slide-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -490,6 +496,8 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   gap: 3px;
   padding: 2px;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .task:hover .drag-handle, .task.dragging .drag-handle { opacity: 1; }
