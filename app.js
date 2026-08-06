@@ -5,6 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
+  var APP_VERSION = 'v8';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1614,6 +1615,8 @@
   render();
   switchView('today');
   updateInstallRow();
+  var versionEl = $('appVersion');
+  if (versionEl) versionEl.textContent = APP_VERSION;
   if (!state.onboarded) openOnboarding();
   else els.taskInput.focus();
   tick();
