@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v12';
+  var APP_VERSION = 'v13';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1370,7 +1370,8 @@
     total: 1500,
     remaining: 1500,
     running: false,
-    interval: null
+    interval: null,
+    endAt: null
   };
 
   var TIMER_C = 389.56;
@@ -1405,34 +1406,43 @@
     $('focusModal').classList.add('hidden');
   }
 
+  function syncTimer() {
+    if (timer.endAt === null) return;
+    timer.remaining = Math.max(0, (timer.endAt - Date.now()) / 1000);
+    if (timer.remaining <= 0) {
+      timer.remaining = 0;
+      timer.running = false;
+      timer.endAt = null;
+      clearInterval(timer.interval);
+      focusChime();
+      toast('Focus session complete \u2014 nice work');
+    }
+    updateTimerUI();
+  }
+
   function startTimerTick() {
     clearInterval(timer.interval);
-    timer.interval = setInterval(function () {
-      if (!timer.running) return;
-      timer.remaining -= 0.25;
-      if (timer.remaining <= 0) {
-        timer.remaining = 0;
-        timer.running = false;
-        clearInterval(timer.interval);
-        focusChime();
-        toast('Focus session complete \u2014 nice work');
-        updateTimerUI();
-        return;
-      }
-      updateTimerUI();
-    }, 250);
+    timer.endAt = Date.now() + timer.remaining * 1000;
+    timer.interval = setInterval(syncTimer, 250);
   }
 
   $('timerStart').addEventListener('click', function () {
     ensureAudio();
-    timer.running = !timer.running;
-    if (timer.running) startTimerTick();
-    else clearInterval(timer.interval);
+    if (!timer.running) {
+      timer.running = true;
+      startTimerTick();
+    } else {
+      syncTimer();
+      timer.running = false;
+      timer.endAt = null;
+      clearInterval(timer.interval);
+    }
     updateTimerUI();
   });
 
   $('timerReset').addEventListener('click', function () {
     timer.running = false;
+    timer.endAt = null;
     clearInterval(timer.interval);
     timer.total = timer.preset * 60;
     timer.remaining = timer.total;
@@ -1443,6 +1453,7 @@
     var btn = e.target.closest('[data-min]');
     if (!btn) return;
     timer.running = false;
+    timer.endAt = null;
     clearInterval(timer.interval);
     timer.preset = +btn.dataset.min;
     timer.total = timer.preset * 60;
@@ -1451,6 +1462,10 @@
       b.classList.toggle('active', b === btn);
     });
     updateTimerUI();
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && timer.endAt !== null) syncTimer();
   });
 
   $('focusClose').addEventListener('click', closeFocusModal);
