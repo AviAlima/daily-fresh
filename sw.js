@@ -1,4 +1,4 @@
-var CACHE = 'daily-fresh-v6';
+var CACHE = 'daily-fresh-v7';
 
 var ASSETS = [
   './',
@@ -38,31 +38,21 @@ self.addEventListener('fetch', function (e) {
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== location.origin) return;
 
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then(function (res) {
+  e.respondWith(
+    fetch(req)
+      .then(function (res) {
+        if (res && res.ok) {
           var copy = res.clone();
           caches.open(CACHE).then(function (c) { c.put(req, copy); });
-          return res;
-        })
-        .catch(function () {
-          return caches.match(req).then(function (m) {
-            return m || caches.match('./index.html');
-          });
-        })
-    );
-    return;
-  }
-
-  e.respondWith(
-    caches.match(req).then(function (cached) {
-      if (cached) return cached;
-      return fetch(req).then(function (res) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
         return res;
-      });
-    })
+      })
+      .catch(function () {
+        return caches.match(req).then(function (m) {
+          if (m) return m;
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          return undefined;
+        });
+      })
   );
 });

@@ -1195,79 +1195,81 @@
     reader.readAsText(file);
   });
 
-  /* ================= Drag & drop (pointer-based, mouse + touch) ================= */
+  /* ================= Drag & drop (pointer events for mouse, native touch events for iOS) ================= */
 
   var dragState = null;
-  var pressTimer = null;
+  var touchTimer = null;
   var pressOrigin = null;
   var suppressClick = false;
   var autoScrollTimer = null;
+  var dragIsTouch = false;
 
-  // iOS claims touch gestures for itself (scroll, text selection, callouts)
-  // and fires pointercancel, killing drags. touch-action + a non-passive
-  // touchstart preventDefault is the combination that reliably keeps the
-  // pointer stream flowing in Safari and in standalone PWA mode.
-  els.taskList.addEventListener('touchstart', function (e) {
-    if (e.target.closest('.task:not(.done)')) e.preventDefault();
-  }, { passive: false });
-
-  function beginDrag(li) {
-    clearTimeout(pressTimer);
+  function beginDrag(li, isTouch) {
+    clearTimeout(touchTimer);
     pressOrigin = null;
+    dragIsTouch = isTouch;
     dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false };
     li.classList.add('dragging');
     li.style.touchAction = 'none';
     if (navigator.vibrate) navigator.vibrate(10);
   }
 
+  // ----- Mouse: drag via the handle (pointer events) -----
+
   els.taskList.addEventListener('pointerdown', function (e) {
     suppressClick = false;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.pointerType !== 'mouse') return;
+    if (e.button !== 0) return;
     var li = e.target.closest('.task');
     if (!li || li.classList.contains('done')) return;
-
-    if (e.target.closest('.drag-handle')) {
-      beginDrag(li);
-      return;
-    }
-    if (e.pointerType === 'mouse') return;
-
-    li.style.touchAction = 'none';
-    pressOrigin = { x: e.clientX, y: e.clientY };
-    clearTimeout(pressTimer);
-    pressTimer = setTimeout(function () { beginDrag(li); }, 280);
+    if (e.target.closest('.drag-handle')) beginDrag(li, false);
   });
 
-  function edgeScroll(clientY) {
-    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    var zone = 40;
-    var speed = 0;
-    if (clientY < zone) speed = (zone - clientY) * 0.35;
-    else if (clientY > vh - zone) speed = -(clientY - (vh - zone)) * 0.35;
-    clearInterval(autoScrollTimer);
-    autoScrollTimer = null;
-    if (speed !== 0) {
-      autoScrollTimer = setInterval(function () { window.scrollBy(0, speed); }, 16);
-    }
-  }
+  window.addEventListener('pointermove', function (e) {
+    if (dragState && !dragIsTouch) applyDrag(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerup', function () { if (!dragIsTouch) endDrag(true); });
+  window.addEventListener('pointercancel', function () { if (!dragIsTouch) endDrag(false); });
 
-  function stopAutoScroll() {
-    clearInterval(autoScrollTimer);
-    autoScrollTimer = null;
-  }
+  // ----- Touch: native touch events (long-press anywhere on a task) -----
+  // iOS/WKWebView claims touch gestures (scroll, text selection, callouts)
+  // and cancels the pointer stream. The reliable combo is touch-action:none
+  // plus preventDefault on a non-passive touchstart, then driving the drag
+  // from touchmove/touchend directly. Works in Safari and standalone PWA.
 
-  function dragMove(e) {
+  els.taskList.addEventListener('touchstart', function (e) {
+    var li = e.target.closest('.task:not(.done)');
+    if (!li) return;
+    e.preventDefault();
+    suppressClick = false;
+    var t = e.touches[0];
+    pressOrigin = { x: t.clientX, y: t.clientY };
+    clearTimeout(touchTimer);
+    touchTimer = setTimeout(function () { beginDrag(li, true); }, 300);
+  }, { passive: false });
+
+  els.taskList.addEventListener('touchmove', function (e) {
+    if (e.cancelable) e.preventDefault();
+    var t = e.touches[0];
+    if (!t) return;
     if (!dragState) {
-      if (pressOrigin) {
-        if (Math.abs(e.clientX - pressOrigin.x) > 10 || Math.abs(e.clientY - pressOrigin.y) > 10) {
-          clearTimeout(pressTimer);
-          pressOrigin = null;
-        }
+      if (pressOrigin && (Math.abs(t.clientX - pressOrigin.x) > 10 || Math.abs(t.clientY - pressOrigin.y) > 10)) {
+        clearTimeout(touchTimer);
+        pressOrigin = null;
       }
       return;
     }
-    if (dragState.startClientY === null) dragState.startClientY = e.clientY;
-    var dy = e.clientY - dragState.startClientY;
+    applyDrag(t.clientX, t.clientY);
+  }, { passive: false });
+
+  els.taskList.addEventListener('touchend', function () { if (dragIsTouch) endDrag(true); });
+  els.taskList.addEventListener('touchcancel', function () { if (dragIsTouch) endDrag(false); });
+  window.addEventListener('blur', function () { endDrag(false); });
+
+  function applyDrag(clientX, clientY) {
+    if (!dragState) return;
+    if (dragState.startClientY === null) dragState.startClientY = clientY;
+    var dy = clientY - dragState.startClientY;
     if (!dragState.moved && Math.abs(dy) < 7) return;
     dragState.moved = true;
 
@@ -1295,11 +1297,29 @@
     if (!inserted && els.taskList.lastElementChild !== dragged) {
       els.taskList.appendChild(dragged);
     }
-    edgeScroll(e.clientY);
+    edgeScroll(clientY);
+  }
+
+  function edgeScroll(clientY) {
+    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    var zone = 40;
+    var speed = 0;
+    if (clientY < zone) speed = (zone - clientY) * 0.35;
+    else if (clientY > vh - zone) speed = -(clientY - (vh - zone)) * 0.35;
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+    if (speed !== 0) {
+      autoScrollTimer = setInterval(function () { window.scrollBy(0, speed); }, 16);
+    }
+  }
+
+  function stopAutoScroll() {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
   }
 
   function endDrag(commit) {
-    clearTimeout(pressTimer);
+    clearTimeout(touchTimer);
     pressOrigin = null;
     stopAutoScroll();
     if (!dragState) return;
@@ -1318,13 +1338,9 @@
       suppressClick = true;
     }
     dragState = null;
+    dragIsTouch = false;
     renderToday();
   }
-
-  window.addEventListener('pointermove', dragMove);
-  window.addEventListener('pointerup', function () { endDrag(true); });
-  window.addEventListener('pointercancel', function () { endDrag(false); });
-  window.addEventListener('blur', function () { endDrag(false); });
 
   els.taskList.addEventListener('click', function (e) {
     if (suppressClick) {
