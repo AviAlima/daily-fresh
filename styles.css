@@ -134,7 +134,7 @@ html[data-theme="light"] .nav-btn:hover { background: rgba(15, 23, 42, 0.05); }
   flex: 1;
   max-width: 760px;
   margin: 0 auto;
-  padding: 40px 32px calc(90px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px));
+  padding: calc(40px + env(safe-area-inset-top, 0px)) 32px calc(90px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px));
   width: 100%;
 }
 
@@ -1424,7 +1424,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
     position: static;
     flex-direction: row;
     align-items: center;
-    padding: 10px 16px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px;
     border-right: none;
     border-bottom: 1px solid var(--border);
     gap: 8px;
@@ -1439,7 +1439,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .nav-btn { width: auto; padding: 8px 12px; font-size: 13px; border-radius: 9px; }
   .nav-btn svg { display: none; }
 
-  .main { padding: 24px 18px calc(70px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
+  .main { padding: calc(24px + env(safe-area-inset-top, 0px)) 18px calc(70px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
 
   #taskInput,
   .text-input,

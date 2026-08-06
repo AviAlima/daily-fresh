@@ -3,6 +3,8 @@
 
   var STORAGE_KEY = 'daily-fresh-state-v2';
   var OLD_KEY = 'daily-fresh-state';
+  var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
+  var CORRUPT_KEY = 'daily-fresh-state-corrupt';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -18,17 +20,42 @@
   /* ================= Storage ================= */
 
   function load() {
+    var raw = null;
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) raw = localStorage.getItem(OLD_KEY);
-      if (!raw) return freshState();
-      var parsed = JSON.parse(raw);
-      var migrated = migrate(parsed);
-      if (raw === localStorage.getItem(OLD_KEY)) localStorage.removeItem(OLD_KEY);
-      return migrated;
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (raw === localStorage.getItem(OLD_KEY)) localStorage.removeItem(OLD_KEY);
+          return migrate(parsed);
+        }
+        quarantine(raw);
+      }
     } catch (e) {
-      return freshState();
+      if (raw) quarantine(raw);
     }
+    var recovered = recoverBackup();
+    if (recovered) return recovered;
+    return freshState();
+  }
+
+  function quarantine(raw) {
+    try { localStorage.setItem(CORRUPT_KEY, raw); } catch (e) {}
+  }
+
+  function recoverBackup() {
+    for (var i = 0; i < BACKUP_KEYS.length; i++) {
+      try {
+        var raw = localStorage.getItem(BACKUP_KEYS[i]);
+        if (!raw) continue;
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && parsed.days) {
+          return migrate(parsed);
+        }
+      } catch (e) {}
+    }
+    return null;
   }
 
   function freshState() {
@@ -49,16 +76,19 @@
     };
     if (p.settings) {
       if (typeof p.settings.resetHour === 'number') s.settings.resetHour = p.settings.resetHour;
+      if (typeof p.settings.theme === 'string') s.settings.theme = p.settings.theme;
+      if (typeof p.settings.sound === 'boolean') s.settings.sound = p.settings.sound;
       if (p.settings.name) s.settings.name = p.settings.name;
     }
     if (Array.isArray(p.tomorrow)) s.tomorrow = p.tomorrow;
     Object.keys(p.days || {}).forEach(function (k) {
       var raw = p.days[k];
+      if (!raw || typeof raw !== 'object') return;
       if (Array.isArray(raw)) {
         s.days[k] = { tasks: raw, note: '', focus: null, reflection: '' };
       } else {
         s.days[k] = {
-          tasks: raw.tasks || [],
+          tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
           note: raw.note || '',
           focus: raw.focus || null,
           reflection: raw.reflection || ''
@@ -68,9 +98,21 @@
     return s;
   }
 
+  function rotateBackups(json) {
+    for (var i = BACKUP_KEYS.length - 1; i >= 1; i--) {
+      try {
+        var prev = localStorage.getItem(BACKUP_KEYS[i - 1]);
+        if (prev) localStorage.setItem(BACKUP_KEYS[i], prev);
+      } catch (e) {}
+    }
+    try { localStorage.setItem(BACKUP_KEYS[0], json); } catch (e) {}
+  }
+
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      var json = JSON.stringify(state);
+      localStorage.setItem(STORAGE_KEY, json);
+      rotateBackups(json);
     } catch (e) {}
   }
 
