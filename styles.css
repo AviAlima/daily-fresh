@@ -53,46 +53,16 @@ input, textarea, button, select { touch-action: manipulation; -webkit-tap-highli
 
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: var(--bg);
+  background:
+    radial-gradient(900px 520px at 88% -10%, rgba(79, 140, 255, 0.05), transparent 60%),
+    var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s, color 0.3s;
   overflow-x: hidden;
 }
 
-/* ---------- Ambient blobs ---------- */
-.blob {
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(70px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: var(--blob-opacity);
-}
-
-.blob-a {
-  width: 480px; height: 480px;
-  top: -140px; right: -100px;
-  background: radial-gradient(circle, rgba(79, 140, 255, 0.16), transparent 70%);
-  animation: drift-a 26s ease-in-out infinite alternate;
-}
-
-.blob-b {
-  width: 420px; height: 420px;
-  bottom: -140px; left: -120px;
-  background: radial-gradient(circle, rgba(76, 208, 125, 0.12), transparent 70%);
-  animation: drift-b 32s ease-in-out infinite alternate;
-}
-
-@keyframes drift-a {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(-60px, 40px) scale(1.15); }
-}
-
-@keyframes drift-b {
-  from { transform: translate(0, 0) scale(1.1); }
-  to { transform: translate(50px, -40px) scale(0.95); }
-}
+.hidden { display: none !important; }
 
 .app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
 
@@ -260,28 +230,6 @@ h1 { font-size: 27px; font-weight: 800; letter-spacing: -0.02em; }
 }
 
 #taskInput::placeholder { color: var(--text-faint); }
-
-/* ---------- Quote ---------- */
-.quote-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 20px;
-  padding: 6px 8px;
-  color: var(--text-faint);
-}
-
-.quote-mark { font-size: 20px; line-height: 1; color: var(--accent); opacity: 0.7; font-family: Georgia, serif; }
-
-.quote-mark:last-child { margin-left: auto; }
-
-.quote-text {
-  font-size: 13.5px;
-  font-style: italic;
-  line-height: 1.5;
-  padding: 1px 8px 0;
-  text-align: center;
-}
 
 /* ---------- Focus card ---------- */
 .focus-card {
@@ -1270,6 +1218,201 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 html[data-theme="light"] .toast { border-color: rgba(15, 23, 42, 0.1); }
 
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- Streak pill ---------- */
+.streak-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Estimate chip ---------- */
+.est-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
+
+/* ---------- Tomorrow ---------- */
+.tomorrow-card {
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.tomorrow-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tomorrow-add input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-faint);
+  font-size: 13.5px;
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.tomorrow-add input:focus { color: var(--text); }
+.tomorrow-add input::placeholder { color: var(--text-faint); }
+
+.tomorrow-add-btn {
+  width: 26px; height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tomorrow-add-btn:hover { background: var(--card-hover); color: var(--text); }
+
+.tomorrow-list { list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+
+.tomorrow-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-radius: 10px;
+  animation: slide-in 0.2s ease both;
+  transition: background 0.15s;
+}
+
+.tomorrow-item:hover { background: var(--card-hover); }
+
+.tomorrow-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-dim);
+  word-break: break-word;
+}
+
+.t-check {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.t-check:hover { border-color: var(--accent); }
+
+.t-check svg { width: 10px; height: 10px; opacity: 0; transition: opacity 0.15s; }
+
+.t-check svg path {
+  fill: none;
+  stroke: white;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tomorrow-item.done .t-check { background: var(--green); border-color: var(--green); }
+.tomorrow-item.done .t-check svg { opacity: 1; }
+.tomorrow-item.done .tomorrow-text { opacity: 0.5; text-decoration: line-through; }
+
+/* ---------- Reflection ---------- */
+.reflection-card {
+  margin-top: 14px;
+  background: var(--green-soft);
+  border: 1px solid rgba(76, 208, 125, 0.3);
+  border-radius: 14px;
+  padding: 14px 16px;
+  animation: slide-in 0.35s ease both;
+}
+
+.reflection-head {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  margin-bottom: 9px;
+}
+
+.reflection-card textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 52px;
+}
+
+.reflection-card textarea::placeholder { color: var(--text-faint); }
+
+.day-note.reflect {
+  border-left-color: var(--green);
+  font-style: italic;
+}
+
+/* ---------- Weekly recap ---------- */
+.recap-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-soft);
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.recap-card strong { color: var(--accent); font-weight: 700; }
+
+/* ---------- Backup ---------- */
+.backup-btns { display: flex; gap: 8px; }
+
+/* ---------- Toast action ---------- */
+.toast-act {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 8px;
+  padding: 6px 14px;
+  margin-left: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toast-act:hover { background: var(--accent-hi); }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 720px) {

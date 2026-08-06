@@ -4,27 +4,6 @@
   var STORAGE_KEY = 'daily-fresh-state-v2';
   var OLD_KEY = 'daily-fresh-state';
 
-  var QUOTES = [
-    'One task at a time is all it takes to move a mountain.',
-    'The secret of getting ahead is getting started.',
-    'You do not rise to the level of your goals. You fall to the level of your systems.',
-    'Concentrate all your thoughts upon the work in hand.',
-    'It always seems impossible until it is done.',
-    'Begin with the end in mind.',
-    'Small steps every day add up to big results.',
-    'The best way to predict the future is to create it.',
-    'Focus on being productive instead of busy.',
-    'Discipline is choosing between what you want now and what you want most.',
-    'Simplicity is the ultimate sophistication.',
-    'Action is the foundational key to all success.',
-    'How you spend your day is how you spend your life.',
-    'Do the hard jobs first. The easy jobs will take care of themselves.',
-    'A goal without a plan is just a wish.',
-    'Every accomplishment starts with the decision to try.',
-    'The shorter way to do many things is to do only one thing at a time.',
-    'Well done is better than well said.'
-  ];
-
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
@@ -56,6 +35,7 @@
     return {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
+      tomorrow: [],
       onboarded: false
     };
   }
@@ -64,18 +44,25 @@
     var s = {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
+      tomorrow: [],
       onboarded: true
     };
     if (p.settings) {
       if (typeof p.settings.resetHour === 'number') s.settings.resetHour = p.settings.resetHour;
       if (p.settings.name) s.settings.name = p.settings.name;
     }
+    if (Array.isArray(p.tomorrow)) s.tomorrow = p.tomorrow;
     Object.keys(p.days || {}).forEach(function (k) {
       var raw = p.days[k];
       if (Array.isArray(raw)) {
-        s.days[k] = { tasks: raw, note: '', focus: null };
+        s.days[k] = { tasks: raw, note: '', focus: null, reflection: '' };
       } else {
-        s.days[k] = { tasks: raw.tasks || [], note: raw.note || '', focus: raw.focus || null };
+        s.days[k] = {
+          tasks: raw.tasks || [],
+          note: raw.note || '',
+          focus: raw.focus || null,
+          reflection: raw.reflection || ''
+        };
       }
     });
     return s;
@@ -133,17 +120,23 @@
     if (activeDay === key) return;
     activeDay = key;
     state.activeDay = key;
-    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null };
+    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };
+    var planned = state.tomorrow || [];
+    if (planned.length) {
+      state.tomorrow = [];
+      state.days[key].tasks = planned.map(function (t) {
+        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, created: new Date().toISOString() };
+      });
+    }
     save();
     if (!silent) {
-      toast(isFirstDay() ? 'Welcome — your page is fresh' : 'A new day has begun');
-      if (!isFirstDay()) confettiBurst();
+      toast(isFirstDay() ? 'Welcome — your page is fresh' : (planned.length ? 'A new day \u2014 your planned tasks are ready' : 'A new day has begun'));
     }
     render();
   }
 
   function dayObj(key) {
-    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null };
+    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };
     return state.days[key];
   }
 
@@ -151,31 +144,58 @@
 
   /* ================= Tasks ================= */
 
-  function addTask(text) {
-    var t = text.trim();
-    if (!t) return;
-    today().tasks.push({
-      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-      text: t,
+  function uid() {
+    return Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  }
+
+  function parseEstimate(text) {
+    var m = text.match(/(\d+(?:\.\d+)?)\s*h\s*(?:(\d+)\s*m)?\s*$/i);
+    if (m) return Math.round(parseFloat(m[1]) * 60 + parseInt(m[2] || 0, 10));
+    m = text.match(/(\d+)\s*m\s*$/i);
+    if (m) return parseInt(m[1], 10);
+    return 0;
+  }
+
+  function fmtEstimate(min) {
+    if (min < 60) return '~' + min + 'm';
+    var h = Math.floor(min / 60);
+    var rest = min % 60;
+    return '~' + h + 'h' + (rest ? ' ' + rest + 'm' : '');
+  }
+
+  function makeTask(text) {
+    return {
+      id: uid(),
+      text: text,
       done: false,
       priority: 0,
       notes: '',
+      estimate: parseEstimate(text),
       carriedFrom: null,
       created: new Date().toISOString()
-    });
+    };
+  }
+
+  function addTask(raw) {
+    var lines = String(raw).split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    if (!lines.length) return;
+    var day = today();
+    lines.forEach(function (line) { day.tasks.push(makeTask(line)); });
     save();
     render();
-    toast('Task added');
+    toast(lines.length === 1 ? 'Task added' : lines.length + ' tasks added');
   }
 
   function removeTask(id) {
     var day = today();
     var idx = day.tasks.findIndex(function (t) { return t.id === id; });
     if (idx === -1) return;
+    pushUndo();
     if (day.focus === id) day.focus = null;
     day.tasks.splice(idx, 1);
     save();
     render();
+    toast('Task deleted', { label: 'Undo', fn: doUndo });
   }
 
   function toggleTask(id) {
@@ -184,10 +204,12 @@
     if (!task) return;
     task.done = !task.done;
     if (task.done) {
+      pushUndo();
       task.doneAt = Date.now();
       if (day.focus === id) day.focus = null;
       completeChime();
-      if (allDone()) setTimeout(function () { toast('All done — enjoy your day'); }, 300);
+      if (allDone()) setTimeout(function () { toast('All done \u2014 enjoy your day'); }, 300);
+      else toast('Completed', { label: 'Undo', fn: doUndo });
     } else {
       task.doneAt = null;
     }
@@ -253,26 +275,48 @@
     return res;
   }
 
-  function carryTask(dayKey, task) {
+  function carryTask(dayKey, task, silent) {
+    pushUndo();
     today().tasks.push({
-      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      id: uid(),
       text: task.text,
       done: false,
       priority: task.priority || 0,
       notes: task.notes || '',
+      estimate: task.estimate || parseEstimate(task.text),
       carriedFrom: { day: dayKey, id: task.id },
       created: new Date().toISOString()
     });
     save();
     render();
-    toast('Added to today');
+    if (!silent) toast('Added to today', { label: 'Undo', fn: doUndo });
   }
 
   function carryAll() {
     var candidates = carryCandidates();
     if (!candidates.length) return;
-    candidates.forEach(function (c) { carryTask(c.day, c.task); });
-    toast(candidates.length + (candidates.length === 1 ? ' task' : ' tasks') + ' brought to today');
+    pushUndo();
+    candidates.forEach(function (c) { carryTask(c.day, c.task, true); });
+    toast(candidates.length + (candidates.length === 1 ? ' task' : ' tasks') + ' brought to today', { label: 'Undo', fn: doUndo });
+  }
+
+  /* ================= Undo ================= */
+
+  var undoSnapshot = null;
+
+  function pushUndo() {
+    undoSnapshot = { dayKey: activeDay, tasks: JSON.stringify(today().tasks) };
+  }
+
+  function doUndo() {
+    if (!undoSnapshot) return;
+    var snap = undoSnapshot;
+    undoSnapshot = null;
+    if (!state.days[snap.dayKey]) state.days[snap.dayKey] = { tasks: [], note: '', focus: null, reflection: '' };
+    state.days[snap.dayKey].tasks = JSON.parse(snap.tasks);
+    save();
+    render();
+    toast('Restored');
   }
 
   /* ================= Elements ================= */
@@ -296,8 +340,8 @@
     doneCount: $('doneCount'),
     emptyToday: $('emptyToday'),
     dayCompleteCard: $('dayCompleteCard'),
-    quoteCard: $('quoteCard'),
-    quoteText: $('quoteText'),
+    reflectionCard: $('reflectionCard'),
+    reflectionInput: $('reflectionInput'),
     focusCard: $('focusCard'),
     focusTaskText: $('focusTaskText'),
     carryWrap: $('carryWrap'),
@@ -305,8 +349,14 @@
     carryList: $('carryList'),
     carryToggle: $('carryToggle'),
     noteInput: $('noteInput'),
+    streakPill: $('streakPill'),
+    tomorrowInput: $('tomorrowInput'),
+    tomorrowAddBtn: $('tomorrowAddBtn'),
+    tomorrowList: $('tomorrowList'),
     historyList: $('historyList'),
     emptyHistory: $('emptyHistory'),
+    recapCard: $('recapCard'),
+    recapLine: $('recapLine'),
     statStreak: $('statStreak'),
     statDone: $('statDone'),
     statRate: $('statRate'),
@@ -316,7 +366,10 @@
     resetHour: $('resetHour'),
     themeSelect: $('themeSelect'),
     soundToggle: $('soundToggle'),
-    nameInput: $('nameInput')
+    nameInput: $('nameInput'),
+    exportBtn: $('exportBtn'),
+    importBtn: $('importBtn'),
+    importFile: $('importFile')
   };
 
   /* ================= Sounds ================= */
@@ -424,6 +477,7 @@
       ? '<span class="priority-dot ' + PRIORITY_LABEL[t.priority] + '" title="Priority"></span>'
       : '';
     var carriedTag = t.carriedFrom ? '<span class="carried-tag">carried</span>' : '';
+    var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
     if (isToday) {
       actions =
@@ -448,6 +502,7 @@
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
       priorityDot +
       '<span class="task-text">' + escapeHtml(t.text) + '</span>' +
+      estChip +
       carriedTag +
       actions +
       notePanel +
@@ -484,11 +539,16 @@
 
     els.emptyToday.style.display = tasks.length ? 'none' : '';
 
-    els.dayCompleteCard.classList.toggle('hidden', !(tasks.length && allDone()));
+    var completed = tasks.length && allDone();
+    els.dayCompleteCard.classList.toggle('hidden', !completed);
+    els.reflectionCard.classList.toggle('hidden', !completed);
 
     var remaining = open.length;
     els.listTitle.textContent = tasks.length ? 'Tasks' : '';
-    els.listSub.textContent = tasks.length ? remaining + (remaining === 1 ? ' remaining' : ' remaining') : '';
+    var planned = open.reduce(function (a, t) { return a + (t.estimate || 0); }, 0);
+    els.listSub.textContent = tasks.length
+      ? remaining + (remaining === 1 ? ' remaining' : ' remaining') + (planned ? ' \u00b7 ' + fmtEstimate(planned) + ' planned' : '')
+      : '';
     els.listHead.style.display = tasks.length ? '' : 'none';
 
     var total = tasks.length;
@@ -496,10 +556,14 @@
     els.ringFg.style.strokeDashoffset = (100 - pct).toFixed(1);
     els.ringCount.textContent = done.length + '/' + total;
 
+    var st = streak();
+    els.streakPill.classList.toggle('hidden', st < 2);
+    els.streakPill.textContent = st + '-day streak';
+
     renderCarry();
     renderFocus();
-    renderQuote();
     renderNote();
+    renderTomorrow();
   }
 
   function greeting() {
@@ -510,13 +574,6 @@
     if (h < 12) return 'Good morning' + suffix;
     if (h < 18) return 'Good afternoon' + suffix;
     return 'Good evening' + suffix;
-  }
-
-  function renderQuote() {
-    var d = new Date();
-    var start = new Date(d.getFullYear(), 0, 0);
-    var dayOfYear = Math.floor((d - start) / 86400000);
-    els.quoteText.textContent = QUOTES[dayOfYear % QUOTES.length];
   }
 
   function renderFocus() {
@@ -552,6 +609,24 @@
     if (document.activeElement !== els.noteInput) {
       els.noteInput.value = val;
     }
+    var reflection = today().reflection || '';
+    if (document.activeElement !== els.reflectionInput) {
+      els.reflectionInput.value = reflection;
+    }
+  }
+
+  function renderTomorrow() {
+    var list = state.tomorrow || [];
+    els.tomorrowList.classList.toggle('hidden', !list.length);
+    els.tomorrowList.innerHTML = list.map(function (t) {
+      return (
+        '<li class="tomorrow-item" data-id="' + t.id + '">' +
+        '<button class="t-check" data-t-done="' + t.id + '" title="Remove" aria-label="Remove from tomorrow">' + checkSvg() + '</button>' +
+        '<span class="tomorrow-text">' + escapeHtml(t.text) + '</span>' +
+        '<button class="icon-btn del" data-t-del="' + t.id + '" title="Delete">' + xIcon() + '</button>' +
+        '</li>'
+      );
+    }).join('');
   }
 
   /* ================= Stats ================= */
@@ -608,6 +683,7 @@
     els.statDone.textContent = totals.done;
     els.statRate.textContent = totals.total ? Math.round((totals.done / totals.total) * 100) + '%' : '0%';
 
+    renderRecap();
     renderCalendar();
 
     var keys = Object.keys(state.days)
@@ -616,6 +692,26 @@
       .reverse();
     els.historyList.innerHTML = keys.map(dayCardHtml).join('');
     els.emptyHistory.style.display = keys.length ? 'none' : '';
+  }
+
+  function renderRecap() {
+    var keys = lastKeys(7);
+    var total = 0;
+    var best = { n: -1, key: null };
+    keys.forEach(function (k) {
+      var st = dayStats(k);
+      total += st.done;
+      if (st.done > best.n) { best.n = st.done; best.key = k; }
+    });
+    if (!total) {
+      els.recapCard.classList.add('hidden');
+      return;
+    }
+    els.recapCard.classList.remove('hidden');
+    var line = 'This week: <strong>' + total + '</strong> task' + (total === 1 ? '' : 's') + ' completed';
+    if (best.n > 0) line += ' \u00b7 best day: <strong>' + dayLabel(best.key) + '</strong> (' + best.n + ')';
+    line += '.';
+    els.recapLine.innerHTML = line;
   }
 
   function dayCardHtml(k) {
@@ -635,6 +731,9 @@
     var note = state.days[k].note
       ? '<div class="day-note">' + escapeHtml(state.days[k].note) + '</div>'
       : '';
+    var reflection = state.days[k].reflection
+      ? '<div class="day-note reflect">' + escapeHtml(state.days[k].reflection) + '</div>'
+      : '';
     return (
       '<div class="day-card" data-day="' + k + '">' +
       '<div class="day-card-head">' +
@@ -644,6 +743,7 @@
       '</div>' +
       '<ul>' + lis + '</ul>' +
       note +
+      reflection +
       '</div>'
     );
   }
@@ -716,38 +816,33 @@
 
   /* ================= Toast ================= */
 
-  function toast(msg) {
+  var toastMsg = null;
+  var toastAct = null;
+
+  function toast(msg, action) {
     var el = $('toast');
-    el.textContent = msg;
+    if (!toastMsg) {
+      toastMsg = document.createElement('span');
+      el.appendChild(toastMsg);
+    }
+    toastMsg.textContent = msg;
+    if (toastAct) {
+      toastAct.remove();
+      toastAct = null;
+    }
+    if (action) {
+      toastAct = document.createElement('button');
+      toastAct.className = 'toast-act';
+      toastAct.textContent = action.label;
+      toastAct.addEventListener('click', function () {
+        el.classList.remove('show');
+        action.fn();
+      });
+      el.appendChild(toastAct);
+    }
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
-  }
-
-  /* ================= Confetti ================= */
-
-  function confettiBurst() {
-    var colors = ['#4f8cff', '#4cd07d', '#ffd166', '#ff6b9d', '#9b7bff'];
-    for (var i = 0; i < 42; i++) {
-      (function () {
-        var p = document.createElement('div');
-        p.style.cssText =
-          'position:fixed;z-index:200;width:8px;height:8px;border-radius:2px;' +
-          'background:' + colors[i % colors.length] + ';' +
-          'left:' + (25 + Math.random() * 50) + 'vw;' +
-          'top:-10px;pointer-events:none;';
-        document.body.appendChild(p);
-        var dx = (Math.random() - 0.5) * 160;
-        var rot = (Math.random() - 0.5) * 720;
-        p.animate(
-          [
-            { transform: 'translate(0,0) rotate(0)', opacity: 1 },
-            { transform: 'translate(' + dx + 'px,' + (window.innerHeight * 0.7 + Math.random() * 120) + 'px) rotate(' + rot + 'deg)', opacity: 0 }
-          ],
-          { duration: 1500 + Math.random() * 900, easing: 'cubic-bezier(0.2,0.6,0.4,1)' }
-        ).onfinish = function () { p.remove(); };
-      })();
-    }
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, action ? 4200 : 2400);
   }
 
   /* ================= View switching ================= */
@@ -886,6 +981,52 @@
     noteSaveTimer = setTimeout(save, 350);
   });
 
+  els.reflectionInput.addEventListener('input', function () {
+    today().reflection = els.reflectionInput.value;
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(save, 350);
+  });
+
+  /* ================= Tomorrow ================= */
+
+  function addTomorrow() {
+    var text = els.tomorrowInput.value.trim();
+    if (!text) return;
+    if (!state.tomorrow) state.tomorrow = [];
+    text.split(/\r?\n/).forEach(function (line) {
+      if (line.trim()) state.tomorrow.push({ id: uid(), text: line.trim() });
+    });
+    els.tomorrowInput.value = '';
+    save();
+    renderToday();
+    els.tomorrowInput.focus();
+    toast('Planned for tomorrow');
+  }
+
+  els.tomorrowAddBtn.addEventListener('click', addTomorrow);
+
+  els.tomorrowInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addTomorrow();
+  });
+
+  els.tomorrowList.addEventListener('click', function (e) {
+    var doneBtn = e.target.closest('[data-t-done]');
+    if (doneBtn) {
+      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== doneBtn.dataset.tDone; });
+      save();
+      renderToday();
+      toast('Removed from tomorrow');
+      return;
+    }
+    var delBtn = e.target.closest('[data-t-del]');
+    if (delBtn) {
+      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== delBtn.dataset.tDel; });
+      save();
+      renderToday();
+      toast('Removed from tomorrow');
+    }
+  });
+
   /* ================= History events ================= */
 
   els.historyList.addEventListener('click', function (e) {
@@ -959,14 +1100,56 @@
     state = {
       settings: state.settings,
       days: {},
+      tomorrow: [],
       onboarded: true
     };
     activeDay = currentDayKey();
     state.activeDay = activeDay;
-    state.days[activeDay] = { tasks: [], note: '', focus: null };
+    state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
     save();
     render();
     toast('Everything erased — a fresh start');
+  });
+
+  /* ================= Backup ================= */
+
+  els.exportBtn.addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'daily-fresh-backup-' + activeDay + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+    toast('Backup downloaded');
+  });
+
+  els.importBtn.addEventListener('click', function () { els.importFile.click(); });
+
+  els.importFile.addEventListener('change', function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || typeof data.days !== 'object') throw new Error('invalid');
+        state = migrate(data);
+        state.onboarded = true;
+        activeDay = currentDayKey();
+        state.activeDay = activeDay;
+        if (!state.days[activeDay]) state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
+        save();
+        applyTheme();
+        render();
+        toast('Backup restored');
+      } catch (err) {
+        toast('Import failed \u2014 invalid file');
+      }
+    };
+    reader.readAsText(file);
   });
 
   /* ================= Drag & drop (pointer-based, mouse + touch) ================= */
