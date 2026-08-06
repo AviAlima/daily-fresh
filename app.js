@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v8';
+  var APP_VERSION = 'v9';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1212,6 +1212,7 @@
     dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false };
     li.classList.add('dragging');
     li.style.touchAction = 'none';
+    li.style.animation = 'none';
     if (navigator.vibrate) navigator.vibrate(10);
   }
 
