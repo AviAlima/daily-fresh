@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v10';
+  var APP_VERSION = 'v11';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1209,6 +1209,7 @@
     clearTimeout(touchTimer);
     pressOrigin = null;
     dragIsTouch = isTouch;
+    suppressClick = true;
     dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false, startTop: li.getBoundingClientRect().top, dy: 0 };
     li.classList.add('dragging');
     li.style.touchAction = 'none';
@@ -1242,7 +1243,6 @@
   els.taskList.addEventListener('touchstart', function (e) {
     var li = e.target.closest('.task:not(.done)');
     if (!li) return;
-    e.preventDefault();
     suppressClick = false;
     var t = e.touches[0];
     pressOrigin = { x: t.clientX, y: t.clientY };
@@ -1264,8 +1264,14 @@
     applyDrag(t.clientX, t.clientY);
   }, { passive: false });
 
-  els.taskList.addEventListener('touchend', function () { if (dragIsTouch) endDrag(true); });
-  els.taskList.addEventListener('touchcancel', function () { if (dragIsTouch) endDrag(false); });
+  els.taskList.addEventListener('touchend', function () {
+    clearTimeout(touchTimer);
+    if (dragIsTouch) endDrag(true);
+  });
+  els.taskList.addEventListener('touchcancel', function () {
+    clearTimeout(touchTimer);
+    if (dragIsTouch) endDrag(false);
+  });
   window.addEventListener('blur', function () { endDrag(false); });
 
   function applyDrag(clientX, clientY) {
