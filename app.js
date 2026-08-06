@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v11';
+  var APP_VERSION = 'v12';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -245,9 +245,9 @@
     var day = today();
     var task = day.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
+    if (!task.done) pushUndo();
     task.done = !task.done;
     if (task.done) {
-      pushUndo();
       task.doneAt = Date.now();
       if (day.focus === id) day.focus = null;
       completeChime();

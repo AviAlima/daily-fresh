@@ -1248,7 +1248,7 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 
 html[data-theme="light"] .toast { border-color: rgba(15, 23, 42, 0.1); }
 
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 
 /* ---------- Streak pill ---------- */
 .streak-pill {
