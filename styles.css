@@ -419,7 +419,12 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   animation: slide-in 0.25s ease both;
   transition: background 0.15s, border-color 0.15s, opacity 0.25s, transform 0.15s;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
+
+.task:not(.done) { touch-action: none; }
 
 .task:hover { background: var(--card-hover); border-color: rgba(79, 140, 255, 0.18); }
 

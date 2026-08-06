@@ -1201,14 +1201,22 @@
   var pressTimer = null;
   var pressOrigin = null;
   var suppressClick = false;
+  var autoScrollTimer = null;
 
-  function beginDrag(li, e) {
+  // iOS claims touch gestures for itself (scroll, text selection, callouts)
+  // and fires pointercancel, killing drags. touch-action + a non-passive
+  // touchstart preventDefault is the combination that reliably keeps the
+  // pointer stream flowing in Safari and in standalone PWA mode.
+  els.taskList.addEventListener('touchstart', function (e) {
+    if (e.target.closest('.task:not(.done)')) e.preventDefault();
+  }, { passive: false });
+
+  function beginDrag(li) {
     clearTimeout(pressTimer);
     pressOrigin = null;
-    dragState = { id: li.dataset.id, el: li, startY: e.clientY, moved: false };
+    dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false };
     li.classList.add('dragging');
     li.style.touchAction = 'none';
-    try { li.setPointerCapture(e.pointerId); } catch (err) {}
     if (navigator.vibrate) navigator.vibrate(10);
   }
 
@@ -1217,20 +1225,36 @@
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     var li = e.target.closest('.task');
     if (!li || li.classList.contains('done')) return;
-    var handle = e.target.closest('.drag-handle');
 
-    if (handle) {
-      beginDrag(li, e);
+    if (e.target.closest('.drag-handle')) {
+      beginDrag(li);
       return;
     }
     if (e.pointerType === 'mouse') return;
 
+    li.style.touchAction = 'none';
     pressOrigin = { x: e.clientX, y: e.clientY };
     clearTimeout(pressTimer);
-    pressTimer = setTimeout(function () {
-      beginDrag(li, e);
-    }, 300);
+    pressTimer = setTimeout(function () { beginDrag(li); }, 280);
   });
+
+  function edgeScroll(clientY) {
+    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    var zone = 40;
+    var speed = 0;
+    if (clientY < zone) speed = (zone - clientY) * 0.35;
+    else if (clientY > vh - zone) speed = -(clientY - (vh - zone)) * 0.35;
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+    if (speed !== 0) {
+      autoScrollTimer = setInterval(function () { window.scrollBy(0, speed); }, 16);
+    }
+  }
+
+  function stopAutoScroll() {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+  }
 
   function dragMove(e) {
     if (!dragState) {
@@ -1242,8 +1266,9 @@
       }
       return;
     }
-    var dy = e.clientY - dragState.startY;
-    if (!dragState.moved && Math.abs(dy) < 6) return;
+    if (dragState.startClientY === null) dragState.startClientY = e.clientY;
+    var dy = e.clientY - dragState.startClientY;
+    if (!dragState.moved && Math.abs(dy) < 7) return;
     dragState.moved = true;
 
     var dragged = dragState.el;
@@ -1270,11 +1295,13 @@
     if (!inserted && els.taskList.lastElementChild !== dragged) {
       els.taskList.appendChild(dragged);
     }
+    edgeScroll(e.clientY);
   }
 
   function endDrag(commit) {
     clearTimeout(pressTimer);
     pressOrigin = null;
+    stopAutoScroll();
     if (!dragState) return;
     var dragged = dragState.el;
     dragged.classList.remove('dragging');
@@ -1294,10 +1321,10 @@
     renderToday();
   }
 
-  els.taskList.addEventListener('pointermove', dragMove);
   window.addEventListener('pointermove', dragMove);
   window.addEventListener('pointerup', function () { endDrag(true); });
   window.addEventListener('pointercancel', function () { endDrag(false); });
+  window.addEventListener('blur', function () { endDrag(false); });
 
   els.taskList.addEventListener('click', function (e) {
     if (suppressClick) {
