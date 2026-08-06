@@ -5,9 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -15,15 +13,20 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - id: deployment
-        uses: actions/deploy-pages@v4
+
+      - name: Publish site to gh-pages branch
+        run: |
+          SITE_DIR="$RUNNER_TEMP/site"
+          mkdir -p "$SITE_DIR"
+          cp index.html styles.css app.js sw.js manifest.json "$SITE_DIR/"
+          cp -r icons "$SITE_DIR/"
+          touch "$SITE_DIR/.nojekyll"
+          cd "$SITE_DIR"
+          git init -q
+          git symbolic-ref HEAD refs/heads/gh-pages
+          git add -A
+          git -c user.name="Avi Alima" -c user.email="avi.alima@gmail.com" commit -q -m "Deploy: $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/$GITHUB_REPOSITORY.git" HEAD:gh-pages
