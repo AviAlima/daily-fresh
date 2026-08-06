@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v9';
+  var APP_VERSION = 'v10';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1209,7 +1209,7 @@
     clearTimeout(touchTimer);
     pressOrigin = null;
     dragIsTouch = isTouch;
-    dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false };
+    dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false, startTop: li.getBoundingClientRect().top, dy: 0 };
     li.classList.add('dragging');
     li.style.touchAction = 'none';
     li.style.animation = 'none';
@@ -1271,13 +1271,16 @@
   function applyDrag(clientX, clientY) {
     if (!dragState) return;
     if (dragState.startClientY === null) dragState.startClientY = clientY;
-    var dy = clientY - dragState.startClientY;
-    if (!dragState.moved && Math.abs(dy) < 7) return;
+    var dyTotal = clientY - dragState.startClientY;
+    if (!dragState.moved && Math.abs(dyTotal) < 7) return;
     dragState.moved = true;
 
     var dragged = dragState.el;
+    var layoutTop = dragged.getBoundingClientRect().top - dragState.dy;
+    dragState.dy = (dragState.startTop + dyTotal) - layoutTop;
+
     dragged.style.transition = 'none';
-    dragged.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
+    dragged.style.transform = 'translateY(' + dragState.dy + 'px) scale(1.02)';
     dragged.style.zIndex = '20';
     dragged.style.position = 'relative';
 
