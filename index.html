@@ -61,7 +61,7 @@
     <section class="view" id="todayView">
       <div class="add-row">
         <button class="add-btn" id="addBtn" title="Add task (Enter)">+</button>
-        <input id="taskInput" type="text" placeholder="Add a task, press Enter" autocomplete="off">
+        <input id="taskInput" type="text" dir="auto" placeholder="Add a task, press Enter" autocomplete="off">
       </div>
 
       <div class="focus-card hidden" id="focusCard">
@@ -71,7 +71,7 @@
           <button class="focus-clear" id="focusClear" title="Clear focus">Clear</button>
         </div>
         <div class="focus-body">
-          <span class="focus-task-text" id="focusTaskText"></span>
+          <span class="focus-task-text" id="focusTaskText" dir="auto"></span>
           <button class="focus-start" id="focusStartBtn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             Start 25 min session
@@ -122,7 +122,7 @@
 
       <div class="reflection-card hidden" id="reflectionCard">
         <div class="reflection-head">What went well today?</div>
-        <textarea id="reflectionInput" rows="2" placeholder="One small win, one good moment..."></textarea>
+        <textarea id="reflectionInput" rows="2" dir="auto" placeholder="One small win, one good moment..."></textarea>
       </div>
 
       <div class="note-card">
@@ -130,12 +130,12 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
           Notes for today
         </div>
-        <textarea id="noteInput" placeholder="Brain dumps, thoughts, context for this day..." rows="3"></textarea>
+        <textarea id="noteInput" placeholder="Brain dumps, thoughts, context for this day..." rows="3" dir="auto"></textarea>
       </div>
 
       <div class="tomorrow-card">
         <div class="tomorrow-add">
-          <input id="tomorrowInput" type="text" placeholder="Plan tomorrow..." autocomplete="off">
+          <input id="tomorrowInput" type="text" dir="auto" placeholder="Plan tomorrow..." autocomplete="off">
           <button class="tomorrow-add-btn" id="tomorrowAddBtn" title="Add to tomorrow">+</button>
         </div>
         <ul class="tomorrow-list hidden" id="tomorrowList"></ul>
@@ -203,7 +203,7 @@
           <span>Your name</span>
           <span class="setting-sub">Used in the daily greeting</span>
         </div>
-        <input type="text" id="nameInput" class="text-input" placeholder="e.g. Avi" maxlength="24">
+        <input type="text" id="nameInput" class="text-input" dir="auto" placeholder="e.g. Avi" maxlength="24">
       </div>
 
       <div class="setting-row">
@@ -312,7 +312,7 @@
     </ul>
     <div class="onboard-name">
       <label for="onboardName">What should we call you? <em>(optional)</em></label>
-      <input type="text" id="onboardName" placeholder="Your name" maxlength="24">
+      <input type="text" id="onboardName" dir="auto" placeholder="Your name" maxlength="24">
     </div>
     <button class="primary-big" id="onboardStart">Start fresh</button>
   </div>

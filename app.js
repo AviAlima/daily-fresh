@@ -535,7 +535,7 @@
     if (isToday && openNoteId === t.id) {
       notePanel =
         '<div class="task-note-panel">' +
-        '<textarea class="task-note-input" data-note-input="' + t.id + '" rows="2" placeholder="Notes for this task...">' + escapeHtml(t.notes || '') + '</textarea>' +
+        '<textarea class="task-note-input" data-note-input="' + t.id + '" rows="2" dir="auto" placeholder="Notes for this task...">' + escapeHtml(t.notes || '') + '</textarea>' +
         '</div>';
     }
     return (
@@ -543,7 +543,7 @@
       '<span class="drag-handle" title="Drag to reorder"><i></i><i></i><i></i></span>' +
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
       priorityDot +
-      '<span class="task-text">' + escapeHtml(t.text) + '</span>' +
+      '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
       carriedTag +
       actions +
@@ -638,7 +638,7 @@
       return (
         '<button class="carry-item" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '">' +
         '<span class="carry-day">' + dayLabel(c.day) + '</span>' +
-        '<span class="carry-text">' + escapeHtml(c.task.text) + '</span>' +
+        '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span>' +
         '</button>'
       );
     }).join('');
@@ -664,7 +664,7 @@
       return (
         '<li class="tomorrow-item" data-id="' + t.id + '">' +
         '<button class="t-check" data-t-done="' + t.id + '" title="Remove" aria-label="Remove from tomorrow">' + checkSvg() + '</button>' +
-        '<span class="tomorrow-text">' + escapeHtml(t.text) + '</span>' +
+        '<span class="tomorrow-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
         '<button class="icon-btn del" data-t-del="' + t.id + '" title="Delete">' + xIcon() + '</button>' +
         '</li>'
       );
@@ -765,16 +765,16 @@
       return (
         '<li class="' + (t.done ? 'done' : '') + '">' +
         '<span class="tick">' + checkSvg() + '</span>' +
-        '<span>' + escapeHtml(t.text) + '</span>' +
+        '<span dir="auto">' + escapeHtml(t.text) + '</span>' +
         carried +
         '</li>'
       );
     }).join('');
     var note = state.days[k].note
-      ? '<div class="day-note">' + escapeHtml(state.days[k].note) + '</div>'
+      ? '<div class="day-note" dir="auto">' + escapeHtml(state.days[k].note) + '</div>'
       : '';
     var reflection = state.days[k].reflection
-      ? '<div class="day-note reflect">' + escapeHtml(state.days[k].reflection) + '</div>'
+      ? '<div class="day-note reflect" dir="auto">' + escapeHtml(state.days[k].reflection) + '</div>'
       : '';
     return (
       '<div class="day-card" data-day="' + k + '">' +
@@ -956,6 +956,7 @@
     var old = textEl.textContent;
     var input = document.createElement('input');
     input.className = 'task-edit-input';
+    input.dir = 'auto';
     input.value = old;
     textEl.replaceWith(input);
     var actions = li.querySelector('.task-actions');
