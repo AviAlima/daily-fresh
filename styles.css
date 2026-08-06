@@ -497,6 +497,25 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   transition: color 0.2s, opacity 0.2s;
 }
 
+/* BiDi: mixed Hebrew/English strings resolve direction from the first
+   strong character, so RTL sentences hug right and keep word order. */
+.task-text,
+.tomorrow-text,
+.carry-text,
+.focus-task-text,
+.day-card li > span:not(.tick),
+.day-note,
+.task-note-input,
+.task-edit-input,
+#taskInput,
+#noteInput,
+#reflectionInput,
+#tomorrowInput,
+.text-input,
+#onboardName {
+  unicode-bidi: plaintext;
+}
+
 .task.done .task-text {
   color: var(--text-dim);
   opacity: 0.55;
