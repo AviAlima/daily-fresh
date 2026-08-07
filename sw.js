@@ -1,4 +1,4 @@
-var CACHE = 'daily-fresh-v14';
+var CACHE = 'daily-fresh-v15';
 
 var ASSETS = [
   './',
