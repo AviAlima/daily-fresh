@@ -20,6 +20,7 @@
   var initialized = false;
   var onRemoteCb = null;
   var onStatusCb = null;
+  var initError = null;
 
   /* ================= Hash ================= */
 
@@ -464,8 +465,13 @@
         db.enablePersistence().catch(function () {});
         auth.onAuthStateChanged(function (u) { user = u; });
       } catch (e) {
+        initError = (e && e.message) ? e.message : String(e);
         app = null; auth = null; db = null;
       }
+    } else if (typeof FIREBASE_CONFIG === 'undefined') {
+      initError = 'FIREBASE_CONFIG is not defined (firebase-config.js missing)';
+    } else {
+      initError = 'FIREBASE_CONFIG is null';
     }
     var st = getSync();
     if (st && st.paired && db) {
@@ -490,6 +496,7 @@
     state: null,
     online: true,
     isConfigured: function () { return !!db; },
+    getInitError: function () { return initError; },
     isPaired: isPaired,
     getCode: function () { var st = getSync(); return st ? st.code : ''; },
     init: init,

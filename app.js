@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v15';
+  var APP_VERSION = 'v16';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -609,7 +609,12 @@
   function renderSync() {
     if (!els.syncRow || !window.Sync) return;
     if (!window.Sync.isConfigured()) {
-      els.syncRow.classList.add('hidden');
+      els.syncRow.classList.remove('hidden');
+      els.syncStartWrap.classList.add('hidden');
+      els.syncBody.classList.add('hidden');
+      els.syncPairWrap.style.display = 'none';
+      els.syncStatus.textContent = 'Sync unavailable: ' + (window.Sync.getInitError ? window.Sync.getInitError() : 'unknown');
+      els.syncStatus.classList.add('offline');
       return;
     }
     els.syncRow.classList.remove('hidden');
