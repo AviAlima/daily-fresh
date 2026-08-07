@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v18';
+  var APP_VERSION = 'v19';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -100,6 +100,7 @@
     });
     if (typeof p.tomorrowTs === 'number') s.tomorrowTs = p.tomorrowTs;
     if (typeof p.nameTs === 'number') s.nameTs = p.nameTs;
+    if (typeof p.resetHourTs === 'number') s.resetHourTs = p.resetHourTs;
     return s;
   }
 
@@ -126,6 +127,7 @@
     state = load();
     activeDay = state.activeDay || currentDayKey();
     if (!state.days[activeDay]) state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
+    ensureDay(true);
   }
 
   /* ================= Day logic ================= */
@@ -1597,8 +1599,12 @@
   });
 
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && timer.endAt !== null) syncTimer();
+    if (document.hidden) return;
+    ensureDay(true);
+    if (timer.endAt !== null) syncTimer();
   });
+
+  window.addEventListener('focus', function () { ensureDay(true); });
 
   $('focusClose').addEventListener('click', closeFocusModal);
 

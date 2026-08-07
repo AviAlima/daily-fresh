@@ -233,6 +233,12 @@
       state.nameTs = rm.nameTs;
       changed = true;
     }
+    if ((rm.resetHourTs || 0) > (state.resetHourTs || 0) && typeof rm.resetHour === 'number') {
+      state.settings = state.settings || {};
+      state.settings.resetHour = rm.resetHour;
+      state.resetHourTs = rm.resetHourTs;
+      changed = true;
+    }
     return { tomorrow: tomorrow, changed: changed };
   }
 
@@ -314,6 +320,14 @@
     } else {
       lm.name = localName;
       lm.nameTs = now;
+    }
+    var localReset = (state.settings && typeof state.settings.resetHour === 'number') ? state.settings.resetHour : 0;
+    if (rm && typeof rm.resetHour === 'number' && rm.resetHour === localReset) {
+      lm.resetHour = rm.resetHour;
+      lm.resetHourTs = rm.resetHourTs || 0;
+    } else {
+      lm.resetHour = localReset;
+      lm.resetHourTs = now;
     }
     var localTomorrow = (state.tomorrow || []).map(function (t) { return { id: t.id, text: t.text }; });
     var remoteTomorrow = (rm && rm.tomorrow || []).map(function (t) { return { id: t.id, text: t.text }; });
@@ -422,7 +436,7 @@
       daysCol = db.collection('users/' + st.hash + '/days');
       return metaRef.get().then(function (snap) {
         if (!snap.exists) {
-          return metaRef.set({ owner: st.hash, name: '', nameTs: 0, tomorrow: [], tomorrowTs: 0 }, { merge: true });
+          return metaRef.set({ owner: st.hash, name: '', nameTs: 0, resetHour: 0, resetHourTs: 0, tomorrow: [], tomorrowTs: 0 }, { merge: true });
         }
       });
     }).then(function () {

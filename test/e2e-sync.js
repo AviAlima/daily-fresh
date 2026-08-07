@@ -106,6 +106,15 @@ async function doneTasks(page) {
   const deskAfterOnline = await openTasks(desk.page);
   check('offline add flushed on reconnect', deskAfterOnline.includes('Offline task'), JSON.stringify(deskAfterOnline));
 
+  // ---- resetHour syncs across devices ----
+  const nowHour = new Date().getHours();
+  await desk.page.click('#navSettings');
+  await sleep(300);
+  await desk.page.selectOption('#resetHour', String(nowHour));
+  await sleep(5000);
+  const phHour = await ph.page.$eval('#resetHour', el => el.value);
+  check('resetHour synced phone<-desktop', phHour === String(nowHour), 'desktop=' + nowHour + ' phone=' + phHour);
+
   // ---- Cleanup test data ----
   await desk.page.click('#navSettings');
   await sleep(300);

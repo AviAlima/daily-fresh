@@ -157,4 +157,35 @@ check('older remote name is ignored', () => {
   assert.equal(state.nameTs, 500);
 });
 
+console.log('resetHour sync');
+check('newer remote resetHour merges into settings', () => {
+  const state = { settings: { resetHour: 0 }, tomorrow: [], tomorrowTs: 0, nameTs: 0, resetHourTs: 0 };
+  const rm = { resetHour: 5, resetHourTs: 900 };
+  S.mergeMeta(state, rm);
+  assert.equal(state.settings.resetHour, 5);
+  assert.equal(state.resetHourTs, 900);
+});
+check('older remote resetHour is ignored', () => {
+  const state = { settings: { resetHour: 0 }, tomorrow: [], tomorrowTs: 0, nameTs: 0, resetHourTs: 500 };
+  const rm = { resetHour: 5, resetHourTs: 100 };
+  S.mergeMeta(state, rm);
+  assert.equal(state.settings.resetHour, 0);
+  assert.equal(state.resetHourTs, 500);
+});
+check('readLocalMeta stamps resetHour when it differs from remote', () => {
+  global.localStorage.setItem('daily-fresh-sync-v1', JSON.stringify({ code: 'ABC', hash: S.hashCode('ABC'), paired: true }));
+  const state = { settings: { resetHour: 3 }, tomorrow: [], tomorrowTs: 0, nameTs: 0 };
+  const remoteMeta = { resetHour: 0, resetHourTs: 1000 };
+  const m = S.readLocalMeta(state, 5000, remoteMeta);
+  assert.equal(m.resetHour, 3);
+  assert.equal(m.resetHourTs, 5000);
+});
+check('readLocalMeta keeps remote ts when equal', () => {
+  global.localStorage.setItem('daily-fresh-sync-v1', JSON.stringify({ code: 'ABC', hash: S.hashCode('ABC'), paired: true }));
+  const state = { settings: { resetHour: 0 }, tomorrow: [], tomorrowTs: 0, nameTs: 0 };
+  const remoteMeta = { resetHour: 0, resetHourTs: 1000 };
+  const m = S.readLocalMeta(state, 5000, remoteMeta);
+  assert.equal(m.resetHourTs, 1000);
+});
+
 console.log(pass + ' checks passed');
