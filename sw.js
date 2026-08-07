@@ -1,10 +1,16 @@
-var CACHE = 'daily-fresh-v13';
+var CACHE = 'daily-fresh-v14';
 
 var ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './sync.js',
+  './firebase-config.js',
+  './vendor/firebase-app-compat.js',
+  './vendor/firebase-auth-compat.js',
+  './vendor/firebase-firestore-compat.js',
+  './vendor/qrcode.min.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

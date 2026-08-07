@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v13';
+  var APP_VERSION = 'v14';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -92,10 +92,14 @@
           tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
           note: raw.note || '',
           focus: raw.focus || null,
-          reflection: raw.reflection || ''
+          reflection: raw.reflection || '',
+          tombstones: Array.isArray(raw.tombstones) ? raw.tombstones : [],
+          fieldTs: (raw.fieldTs && typeof raw.fieldTs === 'object') ? raw.fieldTs : {}
         };
       }
     });
+    if (typeof p.tomorrowTs === 'number') s.tomorrowTs = p.tomorrowTs;
+    if (typeof p.nameTs === 'number') s.nameTs = p.nameTs;
     return s;
   }
 
@@ -115,6 +119,13 @@
       localStorage.setItem(STORAGE_KEY, json);
       rotateBackups(json);
     } catch (e) {}
+    if (window.Sync && window.Sync.onLocalChange) window.Sync.onLocalChange();
+  }
+
+  function reloadFromDisk() {
+    state = load();
+    activeDay = state.activeDay || currentDayKey();
+    if (!state.days[activeDay]) state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
   }
 
   /* ================= Day logic ================= */
@@ -163,8 +174,7 @@
     if (activeDay === key) return;
     activeDay = key;
     state.activeDay = key;
-    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };
-    var planned = state.tomorrow || [];
+    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };    var planned = state.tomorrow || [];
     if (planned.length) {
       state.tomorrow = [];
       state.days[key].tasks = planned.map(function (t) {
@@ -348,7 +358,11 @@
   var undoSnapshot = null;
 
   function pushUndo() {
-    undoSnapshot = { dayKey: activeDay, tasks: JSON.stringify(today().tasks) };
+    undoSnapshot = {
+      dayKey: activeDay,
+      tasks: JSON.stringify(today().tasks),
+      tombstones: JSON.stringify(today().tombstones || [])
+    };
   }
 
   function doUndo() {
@@ -357,6 +371,7 @@
     undoSnapshot = null;
     if (!state.days[snap.dayKey]) state.days[snap.dayKey] = { tasks: [], note: '', focus: null, reflection: '' };
     state.days[snap.dayKey].tasks = JSON.parse(snap.tasks);
+    state.days[snap.dayKey].tombstones = JSON.parse(snap.tombstones || '[]');
     save();
     render();
     toast('Restored');
@@ -412,7 +427,18 @@
     nameInput: $('nameInput'),
     exportBtn: $('exportBtn'),
     importBtn: $('importBtn'),
-    importFile: $('importFile')
+    importFile: $('importFile'),
+    syncRow: $('syncRow'),
+    syncStatus: $('syncStatus'),
+    syncStartWrap: $('syncStartWrap'),
+    syncStart: $('syncStart'),
+    syncBody: $('syncBody'),
+    syncCode: $('syncCode'),
+    syncCopy: $('syncCopy'),
+    syncQr: $('syncQr'),
+    syncInput: $('syncInput'),
+    syncPairBtn: $('syncPairBtn'),
+    syncUnpair: $('syncUnpair')
   };
 
   /* ================= Sounds ================= */
@@ -558,6 +584,49 @@
     renderHistory();
     renderSettings();
     renderNavBadges();
+    renderSync();
+  }
+
+  /* ================= Sync UI ================= */
+
+  function renderQr(code) {
+    var box = els.syncQr;
+    box.innerHTML = '';
+    try {
+      var qr = qrcode(0, 'L');
+      qr.addData(code);
+      qr.make();
+      box.appendChild(qr.createImgTag(4, 8));
+      box.classList.remove('hidden');
+    } catch (e) {
+      box.classList.add('hidden');
+    }
+  }
+
+  function renderSync() {
+    if (!els.syncRow || !window.Sync) return;
+    if (!window.Sync.isConfigured()) {
+      els.syncRow.classList.add('hidden');
+      return;
+    }
+    els.syncRow.classList.remove('hidden');
+    var paired = window.Sync.isPaired();
+    els.syncStartWrap.classList.toggle('hidden', paired);
+    els.syncBody.classList.toggle('hidden', !paired);
+    if (!paired) {
+      els.syncStatus.textContent = 'Link this device to your other one';
+      return;
+    }
+    var online = window.Sync.online !== false;
+    els.syncStatus.textContent = online
+      ? 'Syncing \u2014 connected'
+      : 'Offline \u2014 will sync when back online';
+    els.syncStatus.classList.toggle('offline', !online);
+    var code = window.Sync.getCode();
+    if (els.syncCode.textContent !== code) {
+      els.syncCode.textContent = code;
+      renderQr(code);
+    }
   }
 
   function renderToday() {
@@ -1139,6 +1208,50 @@
     toast('Name saved');
   });
 
+  /* ================= Sync events ================= */
+
+  els.syncStart.addEventListener('click', function () {
+    els.syncStart.disabled = true;
+    window.Sync.start().then(function () {
+      render();
+      toast('Sync started \u2014 scan or enter the code on your other device');
+    }).catch(function () {
+      toast('Sync failed \u2014 check your connection');
+      els.syncStart.disabled = false;
+    });
+  });
+
+  els.syncPairBtn.addEventListener('click', function () {
+    var v = els.syncInput.value;
+    if (!v.trim()) return;
+    els.syncPairBtn.disabled = true;
+    window.Sync.pair(v).then(function () {
+      els.syncInput.value = '';
+      render();
+      toast('Paired \u2014 syncing with your other device');
+    }).catch(function () {
+      toast('Invalid code \u2014 try again');
+      els.syncPairBtn.disabled = false;
+    });
+  });
+
+  els.syncInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') els.syncPairBtn.click();
+  });
+
+  els.syncCopy.addEventListener('click', function () {
+    var code = window.Sync.getCode();
+    if (code && navigator.clipboard) navigator.clipboard.writeText(code);
+    toast('Code copied');
+  });
+
+  els.syncUnpair.addEventListener('click', function () {
+    if (!confirm('Stop syncing? Tasks on this device stay here.')) return;
+    window.Sync.unpair();
+    render();
+    toast('Sync stopped');
+  });
+
   $('resetDataBtn').addEventListener('click', function () {
     if (!confirm('Erase all tasks, notes and history? This cannot be undone.')) return;
     state = {
@@ -1644,5 +1757,9 @@
   if (versionEl) versionEl.textContent = APP_VERSION;
   if (!state.onboarded) openOnboarding();
   else els.taskInput.focus();
+  if (window.Sync) {
+    window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });
+    window.Sync.onStatus(function () { renderSync(); });
+  }
   tick();
 })();

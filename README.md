@@ -33,3 +33,37 @@ python3 -m http.server 8000
 ## Deploy
 
 Pushing to `main` auto-deploys to GitHub Pages via GitHub Actions.
+
+## Sync between devices (optional)
+
+Daily Fresh can sync your tasks between phone and computer via Firebase Firestore,
+with full offline support. Nothing syncs until you opt in:
+
+1. **Enable sync** in Settings on your desktop → a 12-char code appears (with a QR you can scan).
+2. On your phone: Settings → **Sync** → enter the code (or scan the QR).
+3. Done — both devices stay in sync in real time. The code is your private key:
+   only devices with the same code share data.
+
+How it works under the hood:
+
+- **Privacy**: the code never leaves the device — Firestore documents live under a path
+  derived from a hash of the code, and the security rules (see `firestore.rules`)
+  reject everything else. Sync is opt-in; non-paired users stay localStorage-only.
+- **Never lose a task**: every change carries a timestamp. Concurrent edits merge
+  per-field (newest wins), adds are always kept, and deleted tasks become tombstones
+  so a stale device can never resurrect them. Reorder is last-write-wins (cosmetic).
+- **Offline first**: reads are instant from local storage; writes queue locally and
+  flush when connected. No network on the tap path.
+- **Sync code** is stored only on your devices, never in this repository.
+
+### Activating Firebase
+
+1. Create a project at https://console.firebase.google.com
+2. **Firestore Database** → Create database (production mode, any region).
+3. **Authentication** → Sign-in method → enable **Anonymous**.
+4. **Firestore Database** → Rules → paste the contents of `firestore.rules` → Publish.
+5. Project settings → Your apps → Web → register an app → copy the `firebaseConfig`
+   object into `firebase-config.js`.
+6. Bump the SW cache version in `sw.js` and `APP_VERSION` in `app.js`, commit, push.
+
+Free tier is plenty for personal use (50k reads / 20k writes per day).

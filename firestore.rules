@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownMeta(hash) {
+      return get(/databases/$(database)/documents/users/$(hash)/meta).data.owner == hash;
+    }
+
+    // users/{hash}/meta — the pairing marker for a sync code
+    match /users/{hash}/meta {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.owner == hash;
+      allow update: if signedIn()
+        && request.resource.data.owner == hash
+        && resource.data.owner == hash;
+      allow delete: if false;
+    }
+
+    // users/{hash}/days/{date} — per-day task documents
+    match /users/{hash}/days/{day} {
+      allow read, list: if signedIn() && ownMeta(hash);
+      allow create, update: if signedIn() && ownMeta(hash)
+        && request.resource.data.size() < 200000;
+      allow delete: if signedIn() && ownMeta(hash);
+    }
+  }
+}
