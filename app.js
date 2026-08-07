@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v16';
+  var APP_VERSION = 'v17';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1767,8 +1767,8 @@
   if (!state.onboarded) openOnboarding();
   else els.taskInput.focus();
   if (window.Sync) {
-    window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });
     window.Sync.onStatus(function () { renderSync(); });
+    window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });
   }
   tick();
 })();

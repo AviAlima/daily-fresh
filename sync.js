@@ -486,6 +486,7 @@
     }
     window.addEventListener('online', function () { Sync.online = true; notifyStatus(); });
     window.addEventListener('offline', function () { Sync.online = false; notifyStatus(); });
+    notifyStatus();
   }
 
   /* ================= Public API ================= */
