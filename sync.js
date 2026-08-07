@@ -417,7 +417,7 @@
     if (!st || st.code !== codeStr) setSyncState({ code: codeStr, hash: hashCode(codeStr), paired: false });
     st = getSync();
     return ensureAuth().then(function () {
-      metaRef = db.doc('users/' + st.hash + '/meta');
+      metaRef = db.doc('users/' + st.hash);
       daysCol = db.collection('users/' + st.hash + '/days');
       return metaRef.get().then(function (snap) {
         if (!snap.exists) {
@@ -461,7 +461,7 @@
         app = firebase.initializeApp(FIREBASE_CONFIG);
         auth = firebase.auth(app);
         db = firebase.firestore(app);
-        db.enableIndexedDbPersistence().catch(function () {});
+        db.enablePersistence().catch(function () {});
         auth.onAuthStateChanged(function (u) { user = u; });
       } catch (e) {
         app = null; auth = null; db = null;
@@ -470,7 +470,7 @@
     var st = getSync();
     if (st && st.paired && db) {
       ensureAuth().then(function () {
-        metaRef = db.doc('users/' + st.hash + '/meta');
+        metaRef = db.doc('users/' + st.hash);
         daysCol = db.collection('users/' + st.hash + '/days');
         return prime().then(function () {
           startListeners();

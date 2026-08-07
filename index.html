@@ -255,17 +255,17 @@
           <div id="syncStartWrap">
             <button class="timer-btn primary" id="syncStart">Start sync</button>
           </div>
+          <div class="sync-enter-row" id="syncPairWrap">
+            <input type="text" id="syncInput" class="text-input" dir="ltr" autocomplete="off"
+                   placeholder="Enter code from another device">
+            <button class="timer-btn" id="syncPairBtn">Pair</button>
+          </div>
           <div class="hidden" id="syncBody">
             <div class="sync-code-row">
               <code id="syncCode" dir="ltr"></code>
               <button class="icon-btn" id="syncCopy" title="Copy code">copy</button>
             </div>
             <div class="sync-qr hidden" id="syncQr"></div>
-            <div class="sync-enter-row">
-              <input type="text" id="syncInput" class="text-input" dir="ltr" autocomplete="off"
-                     placeholder="Enter code from another device">
-              <button class="timer-btn" id="syncPairBtn">Pair</button>
-            </div>
             <button class="danger-btn sync-unpair" id="syncUnpair">Stop syncing</button>
           </div>
         </div>

@@ -42,9 +42,11 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // settings view
   await page.click('#navSettings');
   await page.waitForTimeout(200);
-  const syncHidden = await page.$eval('#syncRow', el => el.classList.contains('hidden'));
-  console.log('syncRow hidden (no config):', syncHidden);
-  if (!syncHidden) throw new Error('sync row should be hidden without config');
+  const syncVisible = await page.$eval('#syncRow', el => !el.classList.contains('hidden'));
+  console.log('syncRow visible (config present):', syncVisible);
+  if (!syncVisible) throw new Error('sync row should be visible with config');
+  const pairVisible = await page.$eval('#syncPairWrap', el => el.style.display !== 'none');
+  if (!pairVisible) throw new Error('pair input should be visible when unpaired');
 
   // version
   const ver = await page.$eval('#appVersion', el => el.textContent);

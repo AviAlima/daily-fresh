@@ -6,26 +6,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function ownMeta(hash) {
-      return get(/databases/$(database)/documents/users/$(hash)/meta).data.owner == hash;
-    }
-
-    // users/{hash}/meta — the pairing marker for a sync code
-    match /users/{hash}/meta {
+    // users/{hash} is the pairing marker document for a sync code.
+    // The path contains the hashed sync code, so path knowledge is the
+    // capability. Read is allowed for any signed-in user (the path is the
+    // secret); writes require the owner field to match the path.
+    match /users/{hash} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.owner == hash;
       allow update: if signedIn()
         && request.resource.data.owner == hash
         && resource.data.owner == hash;
       allow delete: if false;
-    }
 
-    // users/{hash}/days/{date} — per-day task documents
-    match /users/{hash}/days/{day} {
-      allow read, list: if signedIn() && ownMeta(hash);
-      allow create, update: if signedIn() && ownMeta(hash)
-        && request.resource.data.size() < 200000;
-      allow delete: if signedIn() && ownMeta(hash);
+      // users/{hash}/days/{date} — per-day task documents
+      match /days/{day} {
+        allow read, list: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+        allow create, update: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash
+          && request.resource.data.size() < 200000;
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+      }
     }
   }
 }

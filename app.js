@@ -245,6 +245,8 @@
     if (idx === -1) return;
     pushUndo();
     if (day.focus === id) day.focus = null;
+    if (!day.tombstones) day.tombstones = [];
+    day.tombstones.push({ id: id, deletedAt: Date.now() });
     day.tasks.splice(idx, 1);
     save();
     render();
@@ -436,6 +438,7 @@
     syncCode: $('syncCode'),
     syncCopy: $('syncCopy'),
     syncQr: $('syncQr'),
+    syncPairWrap: $('syncPairWrap'),
     syncInput: $('syncInput'),
     syncPairBtn: $('syncPairBtn'),
     syncUnpair: $('syncUnpair')
@@ -613,6 +616,7 @@
     var paired = window.Sync.isPaired();
     els.syncStartWrap.classList.toggle('hidden', paired);
     els.syncBody.classList.toggle('hidden', !paired);
+    els.syncPairWrap.style.display = paired ? 'none' : '';
     if (!paired) {
       els.syncStatus.textContent = 'Link this device to your other one';
       return;
