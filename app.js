@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v17';
+  var APP_VERSION = 'v18';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1221,11 +1221,16 @@
 
   els.syncStart.addEventListener('click', function () {
     els.syncStart.disabled = true;
+    els.syncStatus.textContent = 'Pairing\u2026';
+    els.syncStatus.classList.remove('offline');
     window.Sync.start().then(function () {
       render();
       toast('Sync started \u2014 scan or enter the code on your other device');
-    }).catch(function () {
-      toast('Sync failed \u2014 check your connection');
+    }).catch(function (e) {
+      var msg = (e && e.code) ? e.code : ((e && e.message) ? e.message : String(e));
+      els.syncStatus.textContent = 'Sync failed: ' + msg;
+      els.syncStatus.classList.add('offline');
+      toast('Sync failed \u2014 ' + msg);
       els.syncStart.disabled = false;
     });
   });
@@ -1234,12 +1239,17 @@
     var v = els.syncInput.value;
     if (!v.trim()) return;
     els.syncPairBtn.disabled = true;
+    els.syncStatus.textContent = 'Pairing\u2026';
+    els.syncStatus.classList.remove('offline');
     window.Sync.pair(v).then(function () {
       els.syncInput.value = '';
       render();
       toast('Paired \u2014 syncing with your other device');
-    }).catch(function () {
-      toast('Invalid code \u2014 try again');
+    }).catch(function (e) {
+      var msg = (e && e.code) ? e.code : ((e && e.message) ? e.message : String(e));
+      els.syncStatus.textContent = 'Pairing failed: ' + msg;
+      els.syncStatus.classList.add('offline');
+      toast('Pairing failed \u2014 ' + msg);
       els.syncPairBtn.disabled = false;
     });
   });
