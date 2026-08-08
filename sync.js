@@ -7,8 +7,10 @@
 
   var SYNC_KEY = 'daily-fresh-sync-v1';
   var STORAGE_KEY = 'daily-fresh-state-v2';
+  var LOG_KEY = 'daily-fresh-sync-log-v1';
+  var MAX_LOG = 200;
   var CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var FIELDS = ['done', 'text', 'priority', 'notes', 'carriedFrom', 'estimate'];
+  var FIELDS = ['done', 'text', 'priority', 'notes', 'carriedFrom', 'estimate', 'order'];
 
   var app = null, auth = null, db = null;
   var user = null;
@@ -21,6 +23,9 @@
   var onRemoteCb = null;
   var onStatusCb = null;
   var initError = null;
+  var syncLog = null;
+  var dirty = false;
+  var syncError = null;
 
   /* ================= Hash ================= */
 
@@ -64,6 +69,30 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {}
   }
 
+  /* ================= Sync log ================= */
+
+  function readSyncLog() {
+    if (!syncLog) {
+      try { syncLog = JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (e) { syncLog = []; }
+    }
+    return syncLog;
+  }
+
+  function logEvent(type, msg, data) {
+    var entry = { t: Date.now(), type: type, msg: msg };
+    if (data !== undefined) entry.d = data;
+    var log = readSyncLog();
+    log.push(entry);
+    if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch (e) {}
+    var st = getSync();
+    if (db && st && st.paired) {
+      try {
+        db.collection('users/' + st.hash + '/logs').add(entry).catch(function () {});
+      } catch (e) {}
+    }
+  }
+
   function isPaired() {
     var st = getSync();
     return !!(st && st.paired && db);
@@ -98,6 +127,7 @@
       priority: t.priority || 0,
       notes: t.notes || '',
       estimate: t.estimate || 0,
+      order: typeof t.order === 'number' ? t.order : 0,
       carriedFrom: t.carriedFrom ? { day: t.carriedFrom.day, id: t.carriedFrom.id } : null,
       created: t.created || new Date().toISOString(),
       doneAt: t.doneAt || null,
@@ -268,6 +298,7 @@
 
     if (changed) {
       writeLocal(state);
+      logEvent('apply', 'merged remote changes into local');
       if (onRemoteCb) onRemoteCb();
     }
   }
@@ -342,35 +373,57 @@
   }
 
   function flush() {
-    if (!isPaired() || !initialized) return;
+    if (!isPaired() || !initialized) return Promise.resolve(false);
     var state = readLocal();
-    if (!state) return;
+    if (!state) return Promise.resolve(false);
     var st = getSync();
     var now = Date.now();
     var batch = db.batch();
     var ops = 0;
+    var dayKeys = [];
 
     Object.keys(state.days || {}).forEach(function (k) {
       var day = normDay(state.days[k]);
       batch.set(db.doc('users/' + st.hash + '/days/' + k), pushDay(day, remoteDays[k], now));
       ops++;
+      dayKeys.push(k);
     });
     Object.keys(remoteDays).forEach(function (k) {
       if (!state.days || !state.days[k]) {
         batch.delete(db.doc('users/' + st.hash + '/days/' + k));
         ops++;
+        dayKeys.push(k + ' (delete)');
       }
     });
     batch.set(metaRef, readLocalMeta(state, now), { merge: true });
     ops++;
 
-    if (ops) batch.commit().catch(function () {});
+    if (!ops) return Promise.resolve(false);
+    logEvent('flush', 'pushing ' + dayKeys.join(', '));
+    return batch.commit().then(function () {
+      dirty = false;
+      syncError = null;
+      logEvent('flush-ok', '');
+      notifyStatus();
+    }).catch(function (e) {
+      var msg = (e && e.message) ? e.message : String(e);
+      syncError = msg;
+      logEvent('flush-error', msg);
+      notifyStatus();
+    });
   }
 
   function onLocalChange() {
     if (!isPaired()) return;
+    dirty = true;
     if (pushTimer) clearTimeout(pushTimer);
     pushTimer = setTimeout(flush, 500);
+  }
+
+  function retryFlush() {
+    if (!dirty || !isPaired() || !initialized) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(flush, 300);
   }
 
   /* ================= Listeners ================= */
@@ -387,6 +440,7 @@
         remoteDays = {};
         qs.forEach(function (d) { remoteDays[d.id] = d.data(); });
         initialized = true;
+        logEvent('prime', qs.size + ' day docs on server');
         applyRemote();
       });
     });
@@ -397,12 +451,18 @@
     unsubs.push(daysCol.onSnapshot(function (snap) {
       remoteDays = {};
       snap.forEach(function (d) { remoteDays[d.id] = d.data(); });
+      logEvent('snapshot-days', snap.size + ' docs');
       applyRemote();
-    }, function () {}));
+    }, function (err) {
+      logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
+    }));
     unsubs.push(metaRef.onSnapshot(function (snap) {
       remoteMeta = snap.exists ? snap.data() : null;
+      logEvent('snapshot-meta', snap.exists ? 'present' : 'absent');
       applyRemote();
-    }, function () {}));
+    }, function (err) {
+      logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
+    }));
     try {
       db.onSnapshotsInSync(function () { Sync.online = true; notifyStatus(); });
     } catch (e) {}
@@ -445,6 +505,7 @@
       return prime().then(function () {
         startListeners();
         flush();
+        logEvent('pair-ok', 'paired');
         return st;
       });
     });
@@ -453,6 +514,7 @@
   function start() {
     var code = genCode();
     setSyncState({ code: code, hash: hashCode(code), paired: false });
+    logEvent('start', 'generated new code ' + code);
     return pair(code);
   }
 
@@ -463,7 +525,10 @@
     initialized = false;
     remoteDays = {};
     remoteMeta = null;
+    dirty = false;
+    syncError = null;
     setSyncState(null);
+    logEvent('unpair', '');
     notifyStatus();
   }
 
@@ -487,6 +552,7 @@
     } else {
       initError = 'FIREBASE_CONFIG is null';
     }
+    logEvent(initError ? 'init-error' : 'init', initError ? initError : 'firebase ready');
     var st = getSync();
     if (st && st.paired && db) {
       ensureAuth().then(function () {
@@ -498,8 +564,12 @@
         });
       }).catch(function () {});
     }
-    window.addEventListener('online', function () { Sync.online = true; notifyStatus(); });
-    window.addEventListener('offline', function () { Sync.online = false; notifyStatus(); });
+    window.addEventListener('online', function () { Sync.online = true; logEvent('online', ''); retryFlush(); notifyStatus(); });
+    window.addEventListener('offline', function () { Sync.online = false; logEvent('offline', ''); notifyStatus(); });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) retryFlush();
+    });
+    setInterval(function () { retryFlush(); }, 30000);
     notifyStatus();
   }
 
@@ -514,6 +584,9 @@
     getInitError: function () { return initError; },
     isPaired: isPaired,
     getCode: function () { var st = getSync(); return st ? st.code : ''; },
+    getLog: function () { return readSyncLog(); },
+    isDirty: function () { return dirty; },
+    getSyncError: function () { return syncError; },
     init: init,
     start: start,
     pair: pair,

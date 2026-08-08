@@ -28,6 +28,13 @@ service cloud.firestore {
         allow delete: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
       }
+
+      // users/{hash}/logs/{id} — best-effort diagnostic sync log mirror
+      match /logs/{id} {
+        allow read, create: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+        allow update, delete: if false;
+      }
     }
   }
 }

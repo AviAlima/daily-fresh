@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v19';
+  var APP_VERSION = 'v21';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -179,8 +179,8 @@
     if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };    var planned = state.tomorrow || [];
     if (planned.length) {
       state.tomorrow = [];
-      state.days[key].tasks = planned.map(function (t) {
-        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, created: new Date().toISOString() };
+      state.days[key].tasks = planned.map(function (t, i) {
+        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString() };
       });
     }
     save();
@@ -226,6 +226,7 @@
       priority: 0,
       notes: '',
       estimate: parseEstimate(text),
+      order: 0,
       carriedFrom: null,
       created: new Date().toISOString()
     };
@@ -235,7 +236,11 @@
     var lines = String(raw).split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     if (!lines.length) return;
     var day = today();
-    lines.forEach(function (line) { day.tasks.push(makeTask(line)); });
+    lines.forEach(function (line) {
+      var t = makeTask(line);
+      t.order = day.tasks.length;
+      day.tasks.push(t);
+    });
     save();
     render();
     toast(lines.length === 1 ? 'Task added' : lines.length + ' tasks added');
@@ -309,6 +314,16 @@
     return tasks.length > 0 && tasks.every(function (t) { return t.done; });
   }
 
+  function orderedTasks(arr) {
+    var idx = {};
+    arr.forEach(function (t, i) { idx[t.id] = i; });
+    return arr.slice().sort(function (a, b) {
+      var oa = typeof a.order === 'number' ? a.order : idx[a.id];
+      var ob = typeof b.order === 'number' ? b.order : idx[b.id];
+      return oa - ob;
+    });
+  }
+
   /* ================= Carry over ================= */
 
   function carryCandidates() {
@@ -334,7 +349,7 @@
 
   function carryTask(dayKey, task, silent) {
     pushUndo();
-    today().tasks.push({
+    var t = {
       id: uid(),
       text: task.text,
       done: false,
@@ -343,7 +358,9 @@
       estimate: task.estimate || parseEstimate(task.text),
       carriedFrom: { day: dayKey, id: task.id },
       created: new Date().toISOString()
-    });
+    };
+    t.order = today().tasks.length;
+    today().tasks.push(t);
     save();
     render();
     if (!silent) toast('Added to today', { label: 'Undo', fn: doUndo });
@@ -629,10 +646,16 @@
       return;
     }
     var online = window.Sync.online !== false;
-    els.syncStatus.textContent = online
-      ? 'Syncing \u2014 connected'
-      : 'Offline \u2014 will sync when back online';
-    els.syncStatus.classList.toggle('offline', !online);
+    var syncErr = window.Sync.getSyncError ? window.Sync.getSyncError() : null;
+    if (syncErr) {
+      els.syncStatus.textContent = 'Sync failed \u2014 will retry';
+      els.syncStatus.classList.add('offline');
+    } else {
+      els.syncStatus.textContent = online
+        ? 'Syncing \u2014 connected'
+        : 'Offline \u2014 will sync when back online';
+      els.syncStatus.classList.toggle('offline', !online);
+    }
     var code = window.Sync.getCode();
     if (els.syncCode.textContent !== code) {
       els.syncCode.textContent = code;
@@ -642,7 +665,7 @@
 
   function renderToday() {
     var day = today();
-    var tasks = day.tasks;
+    var tasks = orderedTasks(day.tasks);
     var open = tasks.filter(function (t) { return !t.done; });
     var done = tasks.filter(function (t) { return t.done; });
 
@@ -838,7 +861,7 @@
   }
 
   function dayCardHtml(k) {
-    var tasks = state.days[k].tasks;
+    var tasks = orderedTasks(state.days[k].tasks);
     var done = tasks.filter(function (t) { return t.done; });
     var statsCls = tasks.length && done.length === tasks.length ? 'done-full' : '';
     var lis = tasks.map(function (t) {
@@ -1292,7 +1315,13 @@
   /* ================= Backup ================= */
 
   els.exportBtn.addEventListener('click', function () {
-    var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    var payload = {
+      version: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      state: state,
+      syncLog: (window.Sync && window.Sync.getLog) ? window.Sync.getLog() : []
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'daily-fresh-backup-' + activeDay + '.json';
@@ -1300,7 +1329,7 @@
     a.click();
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
-    toast('Backup downloaded');
+    toast('Backup downloaded (includes sync log)');
   });
 
   els.importBtn.addEventListener('click', function () { els.importFile.click(); });
@@ -1313,6 +1342,7 @@
     reader.onload = function () {
       try {
         var data = JSON.parse(reader.result);
+        if (data && data.state && typeof data.state.days === 'object') data = data.state;
         if (!data || typeof data.days !== 'object') throw new Error('invalid');
         state = migrate(data);
         state.onboarded = true;
@@ -1479,6 +1509,7 @@
       els.taskList.querySelectorAll('.task').forEach(function (li) { order.push(li.dataset.id); });
       var tasks = today().tasks;
       tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
+      tasks.forEach(function (t, i) { t.order = i; });
       save();
       suppressClick = true;
     }
