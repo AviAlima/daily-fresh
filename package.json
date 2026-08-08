@@ -5,10 +5,14 @@
   "description": "A calm daily task app with cross-device sync (Firebase Firestore)",
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json",
+    "build:test": "tsc -p tsconfig.test.json",
     "typecheck": "npm run build",
-    "test": "npm run build && node test/test-sync.js"
+    "test": "npm run build && npm run build:test && node dist-test/test/test-sync.js",
+    "smoke": "npm run build && npm run build:test && node dist-test/test/smoke.js",
+    "e2e": "npm run build && npm run build:test && node dist-test/test/e2e-sync.js"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "typescript": "^5.5.0"
   }
 }

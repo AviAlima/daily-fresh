@@ -63,7 +63,7 @@ How it works under the hood:
 3. **Authentication** → Sign-in method → enable **Anonymous**.
 4. **Firestore Database** → Rules → paste the contents of `firestore.rules` → Publish.
 5. Project settings → Your apps → Web → register an app → copy the `firebaseConfig`
-   object into `firebase-config.js`.
-6. Bump the SW cache version in `sw.js` and `APP_VERSION` in `app.js`, commit, push.
+   object into `src/firebase-config.ts`.
+6. Bump the SW cache version in `src/sw.ts` and `APP_VERSION` in `src/app.ts`, commit, push.
 
 Free tier is plenty for personal use (50k reads / 20k writes per day).
