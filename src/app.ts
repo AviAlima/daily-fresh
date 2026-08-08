@@ -7,20 +7,20 @@
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
   var APP_VERSION = 'v23';
 
-  var state = load();
+  var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
   var doneOpen = false;
   var carryOpen = true;
-  var openNoteId = null;
-  var toastTimer = null;
-  var noteSaveTimer = null;
+  var openNoteId: string | null = null;
+  var toastTimer: number | null = null;
+  var noteSaveTimer: number | null = null;
   var calView = currentMonth();
   var lastGreeting = '';
 
   /* ================= Storage ================= */
 
-  function load() {
+  function load(): AppState {
     var raw = null;
     try {
       raw = localStorage.getItem(STORAGE_KEY);
@@ -41,11 +41,11 @@
     return freshState();
   }
 
-  function quarantine(raw) {
+  function quarantine(raw: string) {
     try { localStorage.setItem(CORRUPT_KEY, raw); } catch (e) {}
   }
 
-  function recoverBackup() {
+  function recoverBackup(): AppState | null {
     for (var i = 0; i < BACKUP_KEYS.length; i++) {
       try {
         var raw = localStorage.getItem(BACKUP_KEYS[i]);
@@ -59,7 +59,7 @@
     return null;
   }
 
-  function freshState() {
+  function freshState(): AppState {
     return {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
@@ -68,8 +68,8 @@
     };
   }
 
-  function migrate(p) {
-    var s = {
+  function migrate(p: any): AppState {
+    var s: AppState = {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
       tomorrow: [],
@@ -86,7 +86,7 @@
       var raw = p.days[k];
       if (!raw || typeof raw !== 'object') return;
       if (Array.isArray(raw)) {
-        s.days[k] = { tasks: raw, note: '', focus: null, reflection: '' };
+        s.days[k] = { tasks: raw, note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 };
       } else {
         s.days[k] = {
           tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
@@ -94,7 +94,8 @@
           focus: raw.focus || null,
           reflection: raw.reflection || '',
           tombstones: Array.isArray(raw.tombstones) ? raw.tombstones : [],
-          fieldTs: (raw.fieldTs && typeof raw.fieldTs === 'object') ? raw.fieldTs : {}
+          fieldTs: (raw.fieldTs && typeof raw.fieldTs === 'object') ? raw.fieldTs : {},
+          orderTs: typeof raw.orderTs === 'number' ? raw.orderTs : 0
         };
       }
     });
@@ -104,7 +105,7 @@
     return s;
   }
 
-  function rotateBackups(json) {
+  function rotateBackups(json: string) {
     for (var i = BACKUP_KEYS.length - 1; i >= 1; i--) {
       try {
         var prev = localStorage.getItem(BACKUP_KEYS[i - 1]);
@@ -126,13 +127,17 @@
   function reloadFromDisk() {
     state = load();
     activeDay = state.activeDay || currentDayKey();
-    if (!state.days[activeDay]) state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
+    if (!state.days[activeDay]) state.days[activeDay] = newDayObj();
     ensureDay(true);
   }
 
   /* ================= Day logic ================= */
 
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function newDayObj(): DayShape {
+    return { tasks: [], note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 };
+  }
+
+  function pad(n: number) { return n < 10 ? '0' + n : '' + n; }
 
   function currentDayKey() {
     var now = new Date();
@@ -143,13 +148,13 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
-  function shiftKey(key, days) {
+  function shiftKey(key: string, days: number) {
     var parts = key.split('-');
     var d = new Date(+parts[0], +parts[1] - 1, +parts[2] + days);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
-  function dayLabel(key) {
+  function dayLabel(key: string) {
     var parts = key.split('-');
     var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
     var today = new Date();
@@ -161,7 +166,7 @@
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
-  function fullDateLabel(key) {
+  function fullDateLabel(key: string) {
     var parts = key.split('-');
     var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -171,16 +176,17 @@
     return Object.keys(state.days).length <= 1;
   }
 
-  function ensureDay(silent) {
+  function ensureDay(silent?: boolean) {
     var key = currentDayKey();
     if (activeDay === key) return;
     activeDay = key;
     state.activeDay = key;
-    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };    var planned = state.tomorrow || [];
+    if (!state.days[key]) state.days[key] = newDayObj();
+    var planned = state.tomorrow || [];
     if (planned.length) {
       state.tomorrow = [];
       state.days[key].tasks = planned.map(function (t, i) {
-        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString() };
+        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString(), doneAt: null, ts: null };
       });
     }
     save();
@@ -190,8 +196,8 @@
     render();
   }
 
-  function dayObj(key) {
-    if (!state.days[key]) state.days[key] = { tasks: [], note: '', focus: null, reflection: '' };
+  function dayObj(key: string): DayShape {
+    if (!state.days[key]) state.days[key] = newDayObj();
     return state.days[key];
   }
 
@@ -203,22 +209,22 @@
     return Date.now() + '-' + Math.random().toString(36).slice(2, 7);
   }
 
-  function parseEstimate(text) {
+  function parseEstimate(text: string) {
     var m = text.match(/(\d+(?:\.\d+)?)\s*h\s*(?:(\d+)\s*m)?\s*$/i);
-    if (m) return Math.round(parseFloat(m[1]) * 60 + parseInt(m[2] || 0, 10));
+    if (m) return Math.round(parseFloat(m[1]) * 60 + parseInt(m[2] || '0', 10));
     m = text.match(/(\d+)\s*m\s*$/i);
     if (m) return parseInt(m[1], 10);
     return 0;
   }
 
-  function fmtEstimate(min) {
+  function fmtEstimate(min: number) {
     if (min < 60) return '~' + min + 'm';
     var h = Math.floor(min / 60);
     var rest = min % 60;
     return '~' + h + 'h' + (rest ? ' ' + rest + 'm' : '');
   }
 
-  function makeTask(text) {
+  function makeTask(text: string): TaskShape {
     return {
       id: uid(),
       text: text,
@@ -228,11 +234,13 @@
       estimate: parseEstimate(text),
       order: 0,
       carriedFrom: null,
-      created: new Date().toISOString()
+      created: new Date().toISOString(),
+      doneAt: null,
+      ts: null
     };
   }
 
-  function addTask(raw) {
+  function addTask(raw: string) {
     var lines = String(raw).split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     if (!lines.length) return;
     var day = today();
@@ -246,7 +254,7 @@
     toast(lines.length === 1 ? 'Task added' : lines.length + ' tasks added');
   }
 
-  function removeTask(id) {
+  function removeTask(id: string) {
     var day = today();
     var idx = day.tasks.findIndex(function (t) { return t.id === id; });
     if (idx === -1) return;
@@ -260,7 +268,7 @@
     toast('Task deleted', { label: 'Undo', fn: doUndo });
   }
 
-  function toggleTask(id) {
+  function toggleTask(id: string) {
     var day = today();
     var task = day.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
@@ -279,7 +287,7 @@
     render();
   }
 
-  function editTask(id, text) {
+  function editTask(id: string, text: string) {
     var task = today().tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     task.text = text.trim();
@@ -287,7 +295,7 @@
     render();
   }
 
-  function setPriority(id) {
+  function setPriority(id: string) {
     var task = today().tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     task.priority = (task.priority + 1) % 4;
@@ -295,13 +303,13 @@
     render();
   }
 
-  function setNotes(id, text) {
+  function setNotes(id: string, text: string) {
     var task = today().tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     task.notes = text;
   }
 
-  function toggleFocus(id) {
+  function toggleFocus(id: string) {
     var day = today();
     day.focus = day.focus === id ? null : id;
     save();
@@ -314,8 +322,8 @@
     return tasks.length > 0 && tasks.every(function (t) { return t.done; });
   }
 
-  function orderedTasks(arr) {
-    var idx = {};
+  function orderedTasks(arr: TaskShape[]) {
+    var idx: Record<string, number> = {};
     arr.forEach(function (t, i) { idx[t.id] = i; });
     return arr.slice().sort(function (a, b) {
       var oa = typeof a.order === 'number' ? a.order : idx[a.id];
@@ -326,9 +334,9 @@
 
   /* ================= Carry over ================= */
 
-  function carryCandidates() {
+  function carryCandidates(): { day: string; task: TaskShape }[] {
     var todayTasks = today().tasks;
-    var carried = {};
+    var carried: Record<string, boolean> = {};
     todayTasks.forEach(function (t) {
       if (t.carriedFrom) carried[t.carriedFrom.day + ':' + t.carriedFrom.id] = true;
     });
@@ -336,7 +344,7 @@
       .filter(function (k) { return k < activeDay; })
       .sort()
       .reverse();
-    var res = [];
+    var res: { day: string; task: TaskShape }[] = [];
     keys.forEach(function (k) {
       state.days[k].tasks.forEach(function (t) {
         if (!t.done && !carried[k + ':' + t.id]) {
@@ -347,9 +355,9 @@
     return res;
   }
 
-  function carryTask(dayKey, task, silent) {
+  function carryTask(dayKey: string, task: TaskShape, silent?: boolean) {
     pushUndo();
-    var t = {
+    var t: TaskShape = {
       id: uid(),
       text: task.text,
       done: false,
@@ -357,7 +365,10 @@
       notes: task.notes || '',
       estimate: task.estimate || parseEstimate(task.text),
       carriedFrom: { day: dayKey, id: task.id },
-      created: new Date().toISOString()
+      created: new Date().toISOString(),
+      order: 0,
+      doneAt: null,
+      ts: null
     };
     t.order = today().tasks.length;
     today().tasks.push(t);
@@ -376,7 +387,7 @@
 
   /* ================= Undo ================= */
 
-  var undoSnapshot = null;
+  var undoSnapshot: { dayKey: string; tasks: string; tombstones: string } | null = null;
 
   function pushUndo() {
     undoSnapshot = {
@@ -390,7 +401,7 @@
     if (!undoSnapshot) return;
     var snap = undoSnapshot;
     undoSnapshot = null;
-    if (!state.days[snap.dayKey]) state.days[snap.dayKey] = { tasks: [], note: '', focus: null, reflection: '' };
+    if (!state.days[snap.dayKey]) state.days[snap.dayKey] = newDayObj();
     state.days[snap.dayKey].tasks = JSON.parse(snap.tasks);
     state.days[snap.dayKey].tombstones = JSON.parse(snap.tombstones || '[]');
     save();
@@ -401,7 +412,9 @@
   /* ================= Elements ================= */
 
   /** @returns {any} DOM element lookup; typed loosely so UI code stays unchecked */
-  function $(id) { return document.getElementById(id); }
+  function $<T extends HTMLElement = HTMLElement>(id: string): T {
+    return document.getElementById(id) as T;
+  }
 
   var els = {
     greeting: $('greeting'),
@@ -409,7 +422,7 @@
     clock: $('clock'),
     ringFg: $('ringFg'),
     ringCount: $('ringCount'),
-    taskInput: $('taskInput'),
+    taskInput: $<HTMLInputElement>('taskInput'),
     taskList: $('taskList'),
     listHead: $('listHead'),
     listTitle: $('listTitle'),
@@ -421,17 +434,17 @@
     emptyToday: $('emptyToday'),
     dayCompleteCard: $('dayCompleteCard'),
     reflectionCard: $('reflectionCard'),
-    reflectionInput: $('reflectionInput'),
+    reflectionInput: $<HTMLTextAreaElement>('reflectionInput'),
     focusCard: $('focusCard'),
     focusTaskText: $('focusTaskText'),
     carryWrap: $('carryWrap'),
     carryCount: $('carryCount'),
     carryList: $('carryList'),
     carryToggle: $('carryToggle'),
-    noteInput: $('noteInput'),
+    noteInput: $<HTMLTextAreaElement>('noteInput'),
     streakPill: $('streakPill'),
-    tomorrowInput: $('tomorrowInput'),
-    tomorrowAddBtn: $('tomorrowAddBtn'),
+    tomorrowInput: $<HTMLInputElement>('tomorrowInput'),
+    tomorrowAddBtn: $<HTMLButtonElement>('tomorrowAddBtn'),
     tomorrowList: $('tomorrowList'),
     historyList: $('historyList'),
     emptyHistory: $('emptyHistory'),
@@ -443,35 +456,35 @@
     weekChart: $('weekChart'),
     calTitle: $('calTitle'),
     calGrid: $('calGrid'),
-    resetHour: $('resetHour'),
-    themeSelect: $('themeSelect'),
-    soundToggle: $('soundToggle'),
-    nameInput: $('nameInput'),
-    exportBtn: $('exportBtn'),
-    importBtn: $('importBtn'),
-    importFile: $('importFile'),
+    resetHour: $<HTMLSelectElement>('resetHour'),
+    themeSelect: $<HTMLSelectElement>('themeSelect'),
+    soundToggle: $<HTMLInputElement>('soundToggle'),
+    nameInput: $<HTMLInputElement>('nameInput'),
+    exportBtn: $<HTMLButtonElement>('exportBtn'),
+    importBtn: $<HTMLButtonElement>('importBtn'),
+    importFile: $<HTMLInputElement>('importFile'),
     syncRow: $('syncRow'),
     syncStatus: $('syncStatus'),
     syncStartWrap: $('syncStartWrap'),
-    syncStart: $('syncStart'),
+    syncStart: $<HTMLButtonElement>('syncStart'),
     syncBody: $('syncBody'),
     syncCode: $('syncCode'),
-    syncCopy: $('syncCopy'),
+    syncCopy: $<HTMLButtonElement>('syncCopy'),
     syncQr: $('syncQr'),
     syncPairWrap: $('syncPairWrap'),
-    syncInput: $('syncInput'),
-    syncPairBtn: $('syncPairBtn'),
-    syncUnpair: $('syncUnpair'),
-    viewLogBtn: $('viewLogBtn'),
-    copyLogBtn: $('copyLogBtn'),
+    syncInput: $<HTMLInputElement>('syncInput'),
+    syncPairBtn: $<HTMLButtonElement>('syncPairBtn'),
+    syncUnpair: $<HTMLButtonElement>('syncUnpair'),
+    viewLogBtn: $<HTMLButtonElement>('viewLogBtn'),
+    copyLogBtn: $<HTMLButtonElement>('copyLogBtn'),
     syncLogView: $('syncLogView')
   };
 
   /* ================= Sounds ================= */
 
-  var audioCtx = null;
+  var audioCtx: AudioContext | null = null;
 
-  function ensureAudio() {
+  function ensureAudio(): AudioContext | null {
     if (!audioCtx) {
       try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
     }
@@ -479,7 +492,7 @@
     return audioCtx;
   }
 
-  function tone(freq, delay, dur, gain, type) {
+  function tone(freq: number, delay: number, dur: number, gain: number, type?: OscillatorType) {
     var ctx = ensureAudio();
     if (!ctx) return;
     var t = ctx.currentTime + delay;
@@ -532,7 +545,7 @@
 
   /* ================= Rendering ================= */
 
-  function escapeHtml(s) {
+  function escapeHtml(s: unknown) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
@@ -540,19 +553,19 @@
     return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   }
 
-  function flagIcon(on) {
+  function flagIcon(on: boolean) {
     return on
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M4 21V4.5C4 3.7 4.7 3 5.5 3h9.2c.8 0 1.5.7 1.5 1.5V7h2.3c.8 0 1.5.7 1.5 1.5v6.5c0 .8-.7 1.5-1.5 1.5H17v4.5c0 .5-.5 1-1 1H5c-.5 0-1-.5-1-1z"/></svg>'
       : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4.5C4 3.7 4.7 3 5.5 3h9.2c.8 0 1.5.7 1.5 1.5V7h2.3c.8 0 1.5.7 1.5 1.5v6.5c0 .8-.7 1.5-1.5 1.5H17v4.5c0 .5-.5 1-1 1H5c-.5 0-1-.5-1-1z"/></svg>';
   }
 
-  function starIcon(on) {
+  function starIcon(on: boolean) {
     return on
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>'
       : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>';
   }
 
-  function noteIcon(on) {
+  function noteIcon(on?: boolean) {
     return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   }
 
@@ -566,7 +579,7 @@
 
   var PRIORITY_LABEL = ['', 'p-low', 'p-med', 'p-high'];
 
-  function taskHtml(t, dayKey) {
+  function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
     var priorityDot = t.priority
       ? '<span class="priority-dot ' + PRIORITY_LABEL[t.priority] + '" title="Priority"></span>'
@@ -615,7 +628,7 @@
 
   /* ================= Sync UI ================= */
 
-  function renderQr(code) {
+  function renderQr(code: string) {
     var box = els.syncQr;
     box.innerHTML = '';
     try {
@@ -741,7 +754,7 @@
     var candidates = carryCandidates();
     els.carryWrap.classList.toggle('hidden', candidates.length === 0);
     if (!candidates.length) return;
-    els.carryCount.textContent = candidates.length;
+    els.carryCount.textContent = String(candidates.length);
     els.carryList.innerHTML = candidates.map(function (c) {
       return (
         '<button class="carry-item" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '">' +
@@ -781,13 +794,13 @@
 
   /* ================= Stats ================= */
 
-  function lastKeys(n) {
+  function lastKeys(n: number) {
     var keys = [];
     for (var i = 0; i < n; i++) keys.push(shiftKey(activeDay, -i));
     return keys.reverse();
   }
 
-  function dayStats(key) {
+  function dayStats(key: string) {
     var d = state.days[key];
     if (!d || !d.tasks.length) return { total: 0, done: 0, ratio: 0, exists: false };
     var done = d.tasks.filter(function (t) { return t.done; }).length;
@@ -829,8 +842,8 @@
       );
     }).join('');
 
-    els.statStreak.textContent = streak();
-    els.statDone.textContent = totals.done;
+    els.statStreak.textContent = String(streak());
+    els.statDone.textContent = String(totals.done);
     els.statRate.textContent = totals.total ? Math.round((totals.done / totals.total) * 100) + '%' : '0%';
 
     renderRecap();
@@ -847,7 +860,7 @@
   function renderRecap() {
     var keys = lastKeys(7);
     var total = 0;
-    var best = { n: -1, key: null };
+    var best: { n: number; key: string } = { n: -1, key: '' };
     keys.forEach(function (k) {
       var st = dayStats(k);
       total += st.done;
@@ -864,7 +877,7 @@
     els.recapLine.innerHTML = line;
   }
 
-  function dayCardHtml(k) {
+  function dayCardHtml(k: string) {
     var tasks = orderedTasks(state.days[k].tasks);
     var done = tasks.filter(function (t) { return t.done; });
     var statsCls = tasks.length && done.length === tasks.length ? 'done-full' : '';
@@ -905,7 +918,7 @@
     return { y: d.getFullYear(), m: d.getMonth() };
   }
 
-  function calKey(y, m, d) {
+  function calKey(y: number, m: number, d: number) {
     return y + '-' + pad(m + 1) + '-' + pad(d);
   }
 
@@ -947,7 +960,7 @@
 
   function renderNavBadges() {
     var candidates = carryCandidates().length;
-    document.querySelectorAll('.nav-btn').forEach(/** @param {HTMLElement} b */ function (b) {
+    document.querySelectorAll<HTMLElement>('.nav-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.view === currentView);
     });
     var navToday = $('navToday');
@@ -958,7 +971,7 @@
         badge.className = 'carry-count nav-count';
         navToday.appendChild(badge);
       }
-      badge.textContent = candidates;
+      badge.textContent = String(candidates);
     } else if (badge) {
       badge.remove();
     }
@@ -966,10 +979,10 @@
 
   /* ================= Toast ================= */
 
-  var toastMsg = null;
-  var toastAct = null;
+  var toastMsg: HTMLElement | null = null;
+  var toastAct: HTMLButtonElement | null = null;
 
-  function toast(msg, action) {
+  function toast(msg: string, action?: { label: string; fn: () => void }) {
     var el = $('toast');
     if (!toastMsg) {
       toastMsg = document.createElement('span');
@@ -991,13 +1004,13 @@
       el.appendChild(toastAct);
     }
     el.classList.add('show');
-    clearTimeout(toastTimer);
+    clearTimeout(toastTimer ?? undefined);
     toastTimer = setTimeout(function () { el.classList.remove('show'); }, action ? 4200 : 2400);
   }
 
   /* ================= View switching ================= */
 
-  function switchView(view) {
+  function switchView(view: string) {
     currentView = view;
     document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
     $(view + 'View').classList.remove('hidden');
@@ -1010,8 +1023,8 @@
     }
   }
 
-  document.querySelectorAll('.nav-btn').forEach(/** @param {HTMLElement} btn */ function (btn) {
-    btn.addEventListener('click', function () { switchView(btn.dataset.view); });
+  document.querySelectorAll<HTMLElement>('.nav-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { switchView(btn.dataset.view || 'today'); });
   });
 
   /* ================= Today events ================= */
@@ -1030,23 +1043,25 @@
     if (e.key === 'Enter') addCurrentTask();
   });
 
-  function onTaskClick(e) {
-    var check = e.target.closest('[data-check]');
-    if (check) { toggleTask(check.dataset.check); return; }
-    var del = e.target.closest('[data-del]');
-    if (del) { removeTask(del.dataset.del); return; }
-    var edit = e.target.closest('[data-edit]');
-    if (edit) { startEdit(edit.dataset.edit); return; }
-    var star = e.target.closest('[data-star]');
-    if (star) { toggleFocus(star.dataset.star); return; }
-    var flag = e.target.closest('[data-flag]');
-    if (flag) { setPriority(flag.dataset.flag); return; }
-    var note = e.target.closest('[data-note]');
+  function onTaskClick(e: MouseEvent) {
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var check = t.closest<HTMLElement>('[data-check]');
+    if (check) { toggleTask(check.dataset.check || ''); return; }
+    var del = t.closest<HTMLElement>('[data-del]');
+    if (del) { removeTask(del.dataset.del || ''); return; }
+    var edit = t.closest<HTMLElement>('[data-edit]');
+    if (edit) { startEdit(edit.dataset.edit || ''); return; }
+    var star = t.closest<HTMLElement>('[data-star]');
+    if (star) { toggleFocus(star.dataset.star || ''); return; }
+    var flag = t.closest<HTMLElement>('[data-flag]');
+    if (flag) { setPriority(flag.dataset.flag || ''); return; }
+    var note = t.closest<HTMLElement>('[data-note]');
     if (note) {
-      openNoteId = openNoteId === note.dataset.note ? null : note.dataset.note;
+      openNoteId = openNoteId === note.dataset.note ? null : (note.dataset.note || null);
       renderToday();
       if (openNoteId) {
-        var input = /** @type {HTMLInputElement|null} */ (document.querySelector('[data-note-input="' + openNoteId + '"]'));
+        var input = document.querySelector<HTMLInputElement>('[data-note-input="' + openNoteId + '"]');
         if (input) input.focus();
       }
       return;
@@ -1056,23 +1071,23 @@
   els.taskList.addEventListener('click', onTaskClick);
   els.doneList.addEventListener('click', onTaskClick);
 
-  function startEdit(id) {
+  function startEdit(id: string) {
     var li = els.taskList.querySelector('[data-id="' + id + '"]') ||
              els.doneList.querySelector('[data-id="' + id + '"]');
     if (!li) return;
-    var textEl = li.querySelector('.task-text');
+    var textEl = li.querySelector('.task-text') as HTMLElement;
     var old = textEl.textContent;
     var input = document.createElement('input');
     input.className = 'task-edit-input';
     input.dir = 'auto';
-    input.value = old;
+    input.value = old || '';
     textEl.replaceWith(input);
     var actions = li.querySelector('.task-actions');
-    if (actions) actions.style.display = 'none';
+    if (actions) (actions as HTMLElement).style.display = 'none';
     input.focus();
     input.select();
     bringFocusedIntoView(input);
-    var done = function (commit) {
+    var done = function (commit: boolean) {
       if (commit && input.value.trim()) editTask(id, input.value);
       render();
     };
@@ -1084,7 +1099,7 @@
   }
 
   document.addEventListener('input', function (e) {
-    var t = /** @type {HTMLTextAreaElement} */ (e.target);
+    var t = e.target as HTMLTextAreaElement;
     if (t.matches('[data-note-input]')) {
       var task = today().tasks.find(function (x) { return x.id === t.dataset.noteInput; });
       if (task) {
@@ -1101,11 +1116,16 @@
   });
 
   els.carryList.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-carry]');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var btn = t.closest<HTMLElement>('[data-carry]') as HTMLElement;
     if (!btn) return;
-    var dayKey = btn.dataset.carry;
-    var task = state.days[dayKey].tasks.find(function (t) { return t.id === btn.dataset.carryId; });
-    if (task) carryTask(dayKey, task);
+    var dayKey = btn.dataset.carry || '';
+    var day = state.days[dayKey];
+    if (day) {
+      var task = day.tasks.find(function (t) { return t.id === btn.dataset.carryId; });
+      if (task) carryTask(dayKey, task);
+    }
   });
 
   $('carryAll').addEventListener('click', function (e) {
@@ -1129,13 +1149,13 @@
 
   els.noteInput.addEventListener('input', function () {
     today().note = els.noteInput.value;
-    clearTimeout(noteSaveTimer);
+    clearTimeout(noteSaveTimer ?? undefined);
     noteSaveTimer = setTimeout(save, 350);
   });
 
   els.reflectionInput.addEventListener('input', function () {
     today().reflection = els.reflectionInput.value;
-    clearTimeout(noteSaveTimer);
+    clearTimeout(noteSaveTimer ?? undefined);
     noteSaveTimer = setTimeout(save, 350);
   });
 
@@ -1162,17 +1182,19 @@
   });
 
   els.tomorrowList.addEventListener('click', function (e) {
-    var doneBtn = e.target.closest('[data-t-done]');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var doneBtn = t.closest<HTMLElement>('[data-t-done]') as HTMLElement;
     if (doneBtn) {
-      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== doneBtn.dataset.tDone; });
+      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== (doneBtn.dataset.tDone || ''); });
       save();
       renderToday();
       toast('Removed from tomorrow');
       return;
     }
-    var delBtn = e.target.closest('[data-t-del]');
+    var delBtn = t.closest<HTMLElement>('[data-t-del]') as HTMLElement;
     if (delBtn) {
-      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== delBtn.dataset.tDel; });
+      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== (delBtn.dataset.tDel || ''); });
       save();
       renderToday();
       toast('Removed from tomorrow');
@@ -1182,10 +1204,12 @@
   /* ================= History events ================= */
 
   els.historyList.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-del-day]');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var btn = t.closest<HTMLElement>('[data-del-day]');
     if (!btn) return;
     if (confirm('Delete this day from history? This cannot be undone.')) {
-      delete state.days[btn.dataset.delDay];
+      delete state.days[btn.dataset.delDay || ''];
       save();
       render();
       toast('Day deleted');
@@ -1193,7 +1217,9 @@
   });
 
   els.calGrid.addEventListener('click', function (e) {
-    var cell = e.target.closest('[data-cal-day]');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var cell = t.closest<HTMLElement>('[data-cal-day]');
     if (!cell || cell.classList.contains('empty-cell')) return;
     var key = cell.dataset.calDay;
     if (key === activeDay) {
@@ -1305,7 +1331,7 @@
     return (window.Sync && window.Sync.getLog) ? window.Sync.getLog() : [];
   }
 
-  function fallbackCopy(text, done) {
+  function fallbackCopy(text: string, done: (ok: boolean) => void) {
     var ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
@@ -1320,7 +1346,7 @@
 
   els.copyLogBtn.addEventListener('click', function () {
     var text = JSON.stringify(currentSyncLog(), null, 2);
-    function done(ok) { toast(ok ? 'Sync log copied' : 'Copy failed \u2014 select and copy manually'); }
+    function done(ok: boolean) { toast(ok ? 'Sync log copied' : 'Copy failed \u2014 select and copy manually'); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () { fallbackCopy(text, done); });
     } else {
@@ -1351,7 +1377,7 @@
     };
     activeDay = currentDayKey();
     state.activeDay = activeDay;
-    state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
+    state.days[activeDay] = newDayObj();
     save();
     render();
     toast('Everything erased — a fresh start');
@@ -1380,21 +1406,23 @@
   els.importBtn.addEventListener('click', function () { els.importFile.click(); });
 
   els.importFile.addEventListener('change', function () {
-    var input = /** @type {HTMLInputElement} */ (this);
+    var input = this as HTMLInputElement;
+    if (!input.files || !input.files.length) return;
     var file = input.files[0];
     input.value = '';
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        var data = JSON.parse(/** @type {string} */ (reader.result));
+        var result = reader.result;
+        var data = JSON.parse(typeof result === 'string' ? result : '');
         if (data && data.state && typeof data.state.days === 'object') data = data.state;
         if (!data || typeof data.days !== 'object') throw new Error('invalid');
         state = migrate(data);
         state.onboarded = true;
         activeDay = currentDayKey();
         state.activeDay = activeDay;
-        if (!state.days[activeDay]) state.days[activeDay] = { tasks: [], note: '', focus: null, reflection: '' };
+        if (!state.days[activeDay]) state.days[activeDay] = newDayObj();
         save();
         applyTheme();
         render();
@@ -1408,15 +1436,15 @@
 
   /* ================= Drag & drop (pointer events for mouse, native touch events for iOS) ================= */
 
-  var dragState = null;
-  var touchTimer = null;
-  var pressOrigin = null;
+  var dragState: { id: string | undefined; el: HTMLElement; startClientY: number | null; moved: boolean; startTop: number; dy: number } | null = null;
+  var touchTimer: number | null = null;
+  var pressOrigin: { x: number; y: number } | null = null;
   var suppressClick = false;
-  var autoScrollTimer = null;
+  var autoScrollTimer: number | null = null;
   var dragIsTouch = false;
 
-  function beginDrag(li, isTouch) {
-    clearTimeout(touchTimer);
+  function beginDrag(li: HTMLElement, isTouch: boolean) {
+    clearTimeout(touchTimer ?? undefined);
     pressOrigin = null;
     dragIsTouch = isTouch;
     suppressClick = true;
@@ -1433,9 +1461,11 @@
     suppressClick = false;
     if (e.pointerType !== 'mouse') return;
     if (e.button !== 0) return;
-    var li = e.target.closest('.task');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var li = t.closest<HTMLElement>('.task');
     if (!li || li.classList.contains('done')) return;
-    if (e.target.closest('.drag-handle')) beginDrag(li, false);
+    if (t.closest('.drag-handle')) beginDrag(li, false);
   });
 
   window.addEventListener('pointermove', function (e) {
@@ -1451,12 +1481,14 @@
   // from touchmove/touchend directly. Works in Safari and standalone PWA.
 
   els.taskList.addEventListener('touchstart', function (e) {
-    var li = e.target.closest('.task:not(.done)');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var li = t.closest<HTMLElement>('.task:not(.done)') as HTMLElement;
     if (!li) return;
     suppressClick = false;
-    var t = e.touches[0];
-    pressOrigin = { x: t.clientX, y: t.clientY };
-    clearTimeout(touchTimer);
+    var tt = e.touches[0];
+    pressOrigin = { x: tt.clientX, y: tt.clientY };
+    clearTimeout(touchTimer ?? undefined);
     touchTimer = setTimeout(function () { beginDrag(li, true); }, 300);
   }, { passive: false });
 
@@ -1466,7 +1498,7 @@
     if (!t) return;
     if (!dragState) {
       if (pressOrigin && (Math.abs(t.clientX - pressOrigin.x) > 10 || Math.abs(t.clientY - pressOrigin.y) > 10)) {
-        clearTimeout(touchTimer);
+        clearTimeout(touchTimer ?? undefined);
         pressOrigin = null;
       }
       return;
@@ -1475,19 +1507,20 @@
   }, { passive: false });
 
   els.taskList.addEventListener('touchend', function () {
-    clearTimeout(touchTimer);
+    clearTimeout(touchTimer ?? undefined);
     if (dragIsTouch) endDrag(true);
   });
   els.taskList.addEventListener('touchcancel', function () {
-    clearTimeout(touchTimer);
+    clearTimeout(touchTimer ?? undefined);
     if (dragIsTouch) endDrag(false);
   });
   window.addEventListener('blur', function () { endDrag(false); });
 
-  function applyDrag(clientX, clientY) {
+  function applyDrag(clientX: number, clientY: number) {
     if (!dragState) return;
-    if (dragState.startClientY === null) dragState.startClientY = clientY;
-    var dyTotal = clientY - dragState.startClientY;
+    var startY = dragState.startClientY === null ? clientY : dragState.startClientY;
+    dragState.startClientY = startY;
+    var dyTotal = clientY - startY;
     if (!dragState.moved && Math.abs(dyTotal) < 7) return;
     dragState.moved = true;
 
@@ -1521,13 +1554,13 @@
     edgeScroll(clientY);
   }
 
-  function edgeScroll(clientY) {
+  function edgeScroll(clientY: number) {
     var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
     var zone = 40;
     var speed = 0;
     if (clientY < zone) speed = (zone - clientY) * 0.35;
     else if (clientY > vh - zone) speed = -(clientY - (vh - zone)) * 0.35;
-    clearInterval(autoScrollTimer);
+    clearInterval(autoScrollTimer ?? undefined);
     autoScrollTimer = null;
     if (speed !== 0) {
       autoScrollTimer = setInterval(function () { window.scrollBy(0, speed); }, 16);
@@ -1535,12 +1568,12 @@
   }
 
   function stopAutoScroll() {
-    clearInterval(autoScrollTimer);
+    clearInterval(autoScrollTimer ?? undefined);
     autoScrollTimer = null;
   }
 
-  function endDrag(commit) {
-    clearTimeout(touchTimer);
+  function endDrag(commit: boolean) {
+    clearTimeout(touchTimer ?? undefined);
     pressOrigin = null;
     stopAutoScroll();
     if (!dragState) return;
@@ -1551,8 +1584,8 @@
     dragged.style.transform = '';
     dragged.style.zIndex = '';
     if (commit && dragState.moved) {
-      var order = [];
-      els.taskList.querySelectorAll('.task').forEach(function (li) { order.push(li.dataset.id); });
+      var order: string[] = [];
+      els.taskList.querySelectorAll<HTMLElement>('.task').forEach(function (li) { order.push(li.dataset.id || ''); });
       var tasks = today().tasks;
       tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
       tasks.forEach(function (t, i) { t.order = i; });
@@ -1577,7 +1610,7 @@
 
   /* ================= Focus timer ================= */
 
-  var timer = {
+  var timer: { preset: number; total: number; remaining: number; running: boolean; interval: number | null; endAt: number | null } = {
     preset: 25,
     total: 1500,
     remaining: 1500,
@@ -1588,7 +1621,7 @@
 
   var TIMER_C = 389.56;
 
-  function fmtTime(s) {
+  function fmtTime(s: number) {
     var m = Math.floor(s / 60);
     var sec = Math.floor(s % 60);
     return pad(m) + ':' + pad(sec);
@@ -1596,10 +1629,11 @@
 
   function updateTimerUI() {
     $('timerTime').textContent = fmtTime(timer.remaining);
-    var fg = /** @type {any} */ (document.querySelector('.timer-fg'));
-    fg.style.strokeDashoffset = TIMER_C * (1 - (timer.remaining / timer.total));
+    var fg = document.querySelector('.timer-fg') as HTMLElement;
+    fg.style.strokeDashoffset = String(TIMER_C * (1 - (timer.remaining / timer.total)));
     var modal = $('focusModal');
-    modal.querySelector('.timer').classList.toggle('running', timer.running);
+    var timerEl = modal.querySelector('.timer') as HTMLElement;
+    timerEl.classList.toggle('running', timer.running);
     var btn = $('timerStart');
     btn.classList.toggle('running', timer.running);
     btn.textContent = timer.running ? 'Pause' : (timer.remaining < timer.total ? 'Resume' : 'Start');
@@ -1610,7 +1644,8 @@
     if (!task) return;
     $('focusTaskName').textContent = task.text;
     $('focusModal').classList.remove('hidden');
-    $('focusModal').querySelector('.modal').classList.remove('modal-zoom-out');
+    var modalEl = $('focusModal').querySelector('.modal') as HTMLElement;
+    modalEl.classList.remove('modal-zoom-out');
     updateTimerUI();
   }
 
@@ -1625,7 +1660,7 @@
       timer.remaining = 0;
       timer.running = false;
       timer.endAt = null;
-      clearInterval(timer.interval);
+      clearInterval(timer.interval ?? undefined);
       focusChime();
       toast('Focus session complete \u2014 nice work');
     }
@@ -1633,7 +1668,7 @@
   }
 
   function startTimerTick() {
-    clearInterval(timer.interval);
+    clearInterval(timer.interval ?? undefined);
     timer.endAt = Date.now() + timer.remaining * 1000;
     timer.interval = setInterval(syncTimer, 250);
   }
@@ -1647,7 +1682,7 @@
       syncTimer();
       timer.running = false;
       timer.endAt = null;
-      clearInterval(timer.interval);
+      clearInterval(timer.interval ?? undefined);
     }
     updateTimerUI();
   });
@@ -1655,22 +1690,24 @@
   $('timerReset').addEventListener('click', function () {
     timer.running = false;
     timer.endAt = null;
-    clearInterval(timer.interval);
+    clearInterval(timer.interval ?? undefined);
     timer.total = timer.preset * 60;
     timer.remaining = timer.total;
     updateTimerUI();
   });
 
   $('timerPresets').addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-min]');
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var btn = t.closest<HTMLElement>('[data-min]');
     if (!btn) return;
     timer.running = false;
     timer.endAt = null;
-    clearInterval(timer.interval);
-    timer.preset = +btn.dataset.min;
+    clearInterval(timer.interval ?? undefined);
+    timer.preset = +(btn.dataset.min || 0);
     timer.total = timer.preset * 60;
     timer.remaining = timer.total;
-    document.querySelectorAll('#timerPresets button').forEach(function (b) {
+    document.querySelectorAll<HTMLElement>('#timerPresets button').forEach(function (b) {
       b.classList.toggle('active', b === btn);
     });
     updateTimerUI();
@@ -1694,13 +1731,13 @@
 
   function openOnboarding() {
     $('onboardModal').classList.remove('hidden');
-    var nameInput = $('onboardName');
+    var nameInput = $<HTMLInputElement>('onboardName');
     if (state.settings.name) nameInput.value = state.settings.name;
     setTimeout(function () { nameInput.focus(); }, 100);
   }
 
   $('onboardStart').addEventListener('click', function () {
-    var name = $('onboardName').value.trim();
+    var name = $<HTMLInputElement>('onboardName').value.trim();
     if (name) state.settings.name = name;
     state.onboarded = true;
     save();
@@ -1724,8 +1761,9 @@
     }
   });
 
-  function isTyping(el) {
-    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  function isTyping(el: EventTarget | null) {
+    if (!el || !('tagName' in el)) return false;
+    return (el as HTMLElement).tagName === 'INPUT' || (el as HTMLElement).tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable;
   }
 
   /* ================= Keyboard symbiosis ================= */
@@ -1740,7 +1778,7 @@
     return open;
   }
 
-  function bringFocusedIntoView(el) {
+  function bringFocusedIntoView(el: Element | null) {
     if (!document.body.classList.contains('keyboard-open')) return;
     if (el && typeof el.scrollIntoView === 'function') {
       setTimeout(function () {
@@ -1752,9 +1790,9 @@
   }
 
   if (window.visualViewport) {
-    var kbdSettleTimer = null;
+    var kbdSettleTimer: number | null = null;
     window.visualViewport.addEventListener('resize', function () {
-      clearTimeout(kbdSettleTimer);
+      clearTimeout(kbdSettleTimer ?? undefined);
       kbdSettleTimer = setTimeout(function () {
         var open = kbdSpace();
         if (open) {
@@ -1769,12 +1807,12 @@
   }
 
   document.addEventListener('focusin', function (e) {
-    if (isTyping(e.target)) bringFocusedIntoView(e.target);
+    if (isTyping(e.target)) bringFocusedIntoView(e.target as Element);
   });
 
   /* ================= PWA ================= */
 
-  var deferredPrompt = null;
+  var deferredPrompt: BeforeInstallPromptEvent | null = null;
 
   function isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -1789,7 +1827,7 @@
   function updateInstallRow() {
     var row = $('installRow');
     if (!row) return;
-    if (isStandalone() || deferredPrompt === false) {
+    if (isStandalone() || (deferredPrompt as unknown) === false) {
       row.classList.add('hidden');
       return;
     }
@@ -1803,7 +1841,7 @@
 
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
-    deferredPrompt = e;
+    deferredPrompt = e as BeforeInstallPromptEvent;
     updateInstallRow();
   });
 
@@ -1847,7 +1885,7 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./sw.js').catch(function () {});
+      navigator.serviceWorker.register('./dist/sw.js').catch(function () {});
     });
   }
 

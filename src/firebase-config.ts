@@ -1,4 +1,4 @@
-var FIREBASE_CONFIG = {
+(window as any).FIREBASE_CONFIG = {
   apiKey: "AIzaSyANUsiTmFPz-TxaEU__Z1SjDFKaEueT18Q",
   authDomain: "daily-fresh-9b3da.firebaseapp.com",
   projectId: "daily-fresh-9b3da",

@@ -9,7 +9,7 @@ global.localStorage = {
 };
 global.window = { addEventListener() {} };
 
-const S = require('../sync.js');
+const S = require('../dist/sync.js');
 
 const T = (id, text, ts) => ({
   id, text, done: false, priority: 0, notes: '', estimate: 0,

@@ -2,14 +2,12 @@
   "compilerOptions": {
     "target": "ES2019",
     "module": "esnext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2019", "DOM"],
+    "lib": ["ES2019", "WebWorker"],
     "strict": true,
     "outDir": "dist",
     "rootDir": "src",
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "exclude": ["src/sw.ts"]
+  "include": ["src/sw.ts"]
 }
