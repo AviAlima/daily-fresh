@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Type-check and unit tests
+        run: |
+          npm ci --ignore-scripts
+          npm test
+
       - name: Publish site to gh-pages branch
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}

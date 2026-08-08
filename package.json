@@ -1,0 +1,13 @@
+{
+  "name": "daily-fresh",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A calm daily task app with cross-device sync (Firebase Firestore)",
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "npm run typecheck && node test/test-sync.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

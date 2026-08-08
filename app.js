@@ -154,7 +154,7 @@
     var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
     var today = new Date();
     var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    var diff = Math.round((todayStart - d) / 86400000);
+    var diff = Math.round((+todayStart - +d) / 86400000);
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Yesterday';
     if (diff > 1 && diff < 7) return diff + ' days ago';
@@ -400,13 +400,14 @@
 
   /* ================= Elements ================= */
 
+  /** @returns {any} DOM element lookup; typed loosely so UI code stays unchecked */
   function $(id) { return document.getElementById(id); }
 
   var els = {
     greeting: $('greeting'),
     dayDate: $('dayDate'),
     clock: $('clock'),
-    ringFg: document.querySelector('.ring-fg'),
+    ringFg: $('ringFg'),
     ringCount: $('ringCount'),
     taskInput: $('taskInput'),
     taskList: $('taskList'),
@@ -932,7 +933,7 @@
     if (sel.options.length === 0) {
       for (var h = 0; h < 24; h++) {
         var opt = document.createElement('option');
-        opt.value = h;
+        opt.value = String(h);
         var hour12 = h % 12 === 0 ? 12 : h % 12;
         opt.textContent = hour12 + ':00 ' + (h < 12 ? 'AM' : 'PM');
         sel.appendChild(opt);
@@ -946,7 +947,7 @@
 
   function renderNavBadges() {
     var candidates = carryCandidates().length;
-    document.querySelectorAll('.nav-btn').forEach(function (b) {
+    document.querySelectorAll('.nav-btn').forEach(/** @param {HTMLElement} b */ function (b) {
       b.classList.toggle('active', b.dataset.view === currentView);
     });
     var navToday = $('navToday');
@@ -1009,7 +1010,7 @@
     }
   }
 
-  document.querySelectorAll('.nav-btn').forEach(function (btn) {
+  document.querySelectorAll('.nav-btn').forEach(/** @param {HTMLElement} btn */ function (btn) {
     btn.addEventListener('click', function () { switchView(btn.dataset.view); });
   });
 
@@ -1045,7 +1046,7 @@
       openNoteId = openNoteId === note.dataset.note ? null : note.dataset.note;
       renderToday();
       if (openNoteId) {
-        var input = document.querySelector('[data-note-input="' + openNoteId + '"]');
+        var input = /** @type {HTMLInputElement|null} */ (document.querySelector('[data-note-input="' + openNoteId + '"]'));
         if (input) input.focus();
       }
       return;
@@ -1083,10 +1084,11 @@
   }
 
   document.addEventListener('input', function (e) {
-    if (e.target.matches('[data-note-input]')) {
-      var task = today().tasks.find(function (t) { return t.id === e.target.dataset.noteInput; });
+    var t = /** @type {HTMLTextAreaElement} */ (e.target);
+    if (t.matches('[data-note-input]')) {
+      var task = today().tasks.find(function (x) { return x.id === t.dataset.noteInput; });
       if (task) {
-        setNotes(task.id, e.target.value);
+        setNotes(task.id, t.value);
         save();
       }
     }
@@ -1378,13 +1380,14 @@
   els.importBtn.addEventListener('click', function () { els.importFile.click(); });
 
   els.importFile.addEventListener('change', function () {
-    var file = this.files[0];
-    this.value = '';
+    var input = /** @type {HTMLInputElement} */ (this);
+    var file = input.files[0];
+    input.value = '';
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        var data = JSON.parse(reader.result);
+        var data = JSON.parse(/** @type {string} */ (reader.result));
         if (data && data.state && typeof data.state.days === 'object') data = data.state;
         if (!data || typeof data.days !== 'object') throw new Error('invalid');
         state = migrate(data);
@@ -1593,7 +1596,7 @@
 
   function updateTimerUI() {
     $('timerTime').textContent = fmtTime(timer.remaining);
-    var fg = document.querySelector('.timer-fg');
+    var fg = /** @type {any} */ (document.querySelector('.timer-fg'));
     fg.style.strokeDashoffset = TIMER_C * (1 - (timer.remaining / timer.total));
     var modal = $('focusModal');
     modal.querySelector('.timer').classList.toggle('running', timer.running);

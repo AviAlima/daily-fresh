@@ -100,6 +100,7 @@
 
   /* ================= Utils ================= */
 
+  /** @param {Object} o @returns {Object<string, any>} */
   function copyObj(o) {
     var out = {};
     Object.keys(o || {}).forEach(function (k) { out[k] = o[k]; });
@@ -119,6 +120,7 @@
     return false;
   }
 
+  /** @param {TaskShape} t @returns {TaskShape} */
   function cloneTask(t) {
     return {
       id: t.id,
@@ -135,6 +137,7 @@
     };
   }
 
+  /** @param {DayShape} d @returns {DayShape} */
   function normDay(d) {
     if (!d.tombstones) d.tombstones = [];
     if (!d.fieldTs) d.fieldTs = {};
@@ -173,6 +176,7 @@
 
   /* ================= Merge engine ================= */
 
+  /** @param {TaskShape} lt @param {TaskShape} rt @returns {{task: TaskShape, changed: boolean}} */
   function mergeTask(lt, rt) {
     var changed = false;
     var out = cloneTask(lt);
@@ -195,6 +199,7 @@
     return { task: out, changed: changed };
   }
 
+  /** @param {DayShape} local @param {DayShape} remote @returns {{day: DayShape, changed: boolean}} */
   function mergeDay(local, remote) {
     var changed = false;
     var day = {
@@ -320,6 +325,7 @@
 
   /* ================= Push ================= */
 
+  /** @param {DayShape} day @param {DayShape|null} remote @param {number} now @returns {DayShape} */
   function pushDay(day, remote, now) {
     var rtsMap = {};
     ((remote && remote.tasks) || []).forEach(function (rt) { rtsMap[rt.id] = rt; });

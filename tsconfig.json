@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "target": "ES2019",
+    "lib": ["ES2019", "DOM"],
+    "strict": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["app.js", "sync.js", "firebase-config.js", "types.d.ts"]
+}
