@@ -16,8 +16,8 @@ const STORAGE_KEY = 'daily-fresh-state-v2';
 const LOG_KEY = 'daily-fresh-sync-log-v1';
 const MAX_LOG = 200;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const FIELDS: Array<'done' | 'text' | 'priority' | 'notes' | 'carriedFrom' | 'estimate' | 'order'> =
-  ['done', 'text', 'priority', 'notes', 'carriedFrom', 'estimate', 'order'];
+const FIELDS: Array<'done' | 'text' | 'carriedFrom' | 'estimate' | 'order'> =
+  ['done', 'text', 'carriedFrom', 'estimate', 'order'];
 
 let app: any = null;
 let auth: any = null;
@@ -136,8 +136,6 @@ function cloneTask(t: TaskShape): TaskShape {
     id: t.id,
     text: t.text,
     done: !!t.done,
-    priority: t.priority || 0,
-    notes: t.notes || '',
     estimate: t.estimate || 0,
     order: typeof t.order === 'number' ? t.order : 0,
     carriedFrom: t.carriedFrom ? { day: t.carriedFrom.day, id: t.carriedFrom.id } : null,

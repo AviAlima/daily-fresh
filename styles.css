@@ -517,7 +517,6 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
 .focus-task-text,
 .day-card li > span:not(.tick),
 .day-note,
-.task-note-input,
 .task-edit-input,
 #taskInput,
 #noteInput,
@@ -534,11 +533,6 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   text-decoration: line-through;
   text-decoration-color: rgba(154, 165, 180, 0.5);
 }
-
-.priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.priority-dot.p-low { background: var(--green); }
-.priority-dot.p-med { background: var(--orange); }
-.priority-dot.p-high { background: var(--red); box-shadow: 0 0 8px var(--red); }
 
 .carried-tag {
   flex-shrink: 0;
@@ -572,31 +566,7 @@ html[data-theme="light"] .icon-btn:hover { background: rgba(15, 23, 42, 0.06); }
 .icon-btn.star.on { color: var(--accent); background: var(--accent-soft); }
 .icon-btn.star:hover { color: var(--accent); }
 
-.icon-btn.flag.on-low { color: var(--green); }
-.icon-btn.flag.on-med { color: var(--orange); }
-.icon-btn.flag.on-high { color: var(--red); }
-.icon-btn.flag:hover { color: var(--text-dim); }
-
 .icon-btn.del:hover { background: var(--red-soft); color: var(--red); }
-
-.task-note-panel { grid-column: 1 / -1; padding-top: 8px; }
-
-.task-note-input {
-  width: 100%;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-  padding: 8px 10px;
-  resize: vertical;
-  min-height: 34px;
-  outline: none;
-}
-
-html[data-theme="light"] .task-note-input { background: rgba(15, 23, 42, 0.04); }
-.task-note-input:focus { border-color: rgba(79, 140, 255, 0.5); }
 
 .task-edit-input {
   flex: 1;
@@ -1539,7 +1509,6 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
 
   #taskInput,
   .text-input,
-  .task-note-input,
   .task-edit-input,
   .note-card textarea,
   .onboard-name input { font-size: 16px; }

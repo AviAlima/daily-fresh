@@ -12,7 +12,6 @@
   var currentView = 'today';
   var doneOpen = false;
   var carryOpen = true;
-  var openNoteId: string | null = null;
   var toastTimer: number | null = null;
   var noteSaveTimer: number | null = null;
   var calView = currentMonth();
@@ -186,7 +185,7 @@
     if (planned.length) {
       state.tomorrow = [];
       state.days[key].tasks = planned.map(function (t, i) {
-        return { id: t.id || uid(), text: t.text, done: false, priority: 0, notes: '', estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString(), doneAt: null, ts: null };
+        return { id: t.id || uid(), text: t.text, done: false, estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString(), doneAt: null, ts: null };
       });
     }
     save();
@@ -229,8 +228,6 @@
       id: uid(),
       text: text,
       done: false,
-      priority: 0,
-      notes: '',
       estimate: parseEstimate(text),
       order: 0,
       carriedFrom: null,
@@ -295,20 +292,6 @@
     render();
   }
 
-  function setPriority(id: string) {
-    var task = today().tasks.find(function (t) { return t.id === id; });
-    if (!task) return;
-    task.priority = (task.priority + 1) % 4;
-    save();
-    render();
-  }
-
-  function setNotes(id: string, text: string) {
-    var task = today().tasks.find(function (t) { return t.id === id; });
-    if (!task) return;
-    task.notes = text;
-  }
-
   function toggleFocus(id: string) {
     var day = today();
     day.focus = day.focus === id ? null : id;
@@ -361,8 +344,6 @@
       id: uid(),
       text: task.text,
       done: false,
-      priority: task.priority || 0,
-      notes: task.notes || '',
       estimate: task.estimate || parseEstimate(task.text),
       carriedFrom: { day: dayKey, id: task.id },
       created: new Date().toISOString(),
@@ -553,20 +534,10 @@
     return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   }
 
-  function flagIcon(on: boolean) {
-    return on
-      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M4 21V4.5C4 3.7 4.7 3 5.5 3h9.2c.8 0 1.5.7 1.5 1.5V7h2.3c.8 0 1.5.7 1.5 1.5v6.5c0 .8-.7 1.5-1.5 1.5H17v4.5c0 .5-.5 1-1 1H5c-.5 0-1-.5-1-1z"/></svg>'
-      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4.5C4 3.7 4.7 3 5.5 3h9.2c.8 0 1.5.7 1.5 1.5V7h2.3c.8 0 1.5.7 1.5 1.5v6.5c0 .8-.7 1.5-1.5 1.5H17v4.5c0 .5-.5 1-1 1H5c-.5 0-1-.5-1-1z"/></svg>';
-  }
-
   function starIcon(on: boolean) {
     return on
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>'
       : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>';
-  }
-
-  function noteIcon(on?: boolean) {
-    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   }
 
   function pencilIcon() {
@@ -577,13 +548,8 @@
     return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   }
 
-  var PRIORITY_LABEL = ['', 'p-low', 'p-med', 'p-high'];
-
   function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
-    var priorityDot = t.priority
-      ? '<span class="priority-dot ' + PRIORITY_LABEL[t.priority] + '" title="Priority"></span>'
-      : '';
     var carriedTag = t.carriedFrom ? '<span class="carried-tag">carried</span>' : '';
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
@@ -591,29 +557,18 @@
       actions =
         '<div class="task-actions">' +
         '<button class="icon-btn star' + (dayObj(dayKey).focus === t.id ? ' on' : '') + '" data-star="' + t.id + '" title="Set as today\u2019s focus">' + starIcon(dayObj(dayKey).focus === t.id) + '</button>' +
-        '<button class="icon-btn flag' + (t.priority ? ' on-' + PRIORITY_LABEL[t.priority] : '') + '" data-flag="' + t.id + '" title="Priority (cycles high \u2192 med \u2192 low)">' + flagIcon(!!t.priority) + '</button>' +
-        '<button class="icon-btn note' + (openNoteId === t.id ? ' on' : '') + '" data-note="' + t.id + '" title="Notes">' + noteIcon() + '</button>' +
         '<button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button>' +
         '<button class="icon-btn del" data-del="' + t.id + '" title="Delete">' + xIcon() + '</button>' +
-        '</div>';
-    }
-    var notePanel = '';
-    if (isToday && openNoteId === t.id) {
-      notePanel =
-        '<div class="task-note-panel">' +
-        '<textarea class="task-note-input" data-note-input="' + t.id + '" rows="2" dir="auto" placeholder="Notes for this task...">' + escapeHtml(t.notes || '') + '</textarea>' +
         '</div>';
     }
     return (
       '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
       '<span class="drag-handle" title="Drag to reorder"><i></i><i></i><i></i></span>' +
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
-      priorityDot +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
       carriedTag +
       actions +
-      notePanel +
       '</li>'
     );
   }
@@ -1054,18 +1009,6 @@
     if (edit) { startEdit(edit.dataset.edit || ''); return; }
     var star = t.closest<HTMLElement>('[data-star]');
     if (star) { toggleFocus(star.dataset.star || ''); return; }
-    var flag = t.closest<HTMLElement>('[data-flag]');
-    if (flag) { setPriority(flag.dataset.flag || ''); return; }
-    var note = t.closest<HTMLElement>('[data-note]');
-    if (note) {
-      openNoteId = openNoteId === note.dataset.note ? null : (note.dataset.note || null);
-      renderToday();
-      if (openNoteId) {
-        var input = document.querySelector<HTMLInputElement>('[data-note-input="' + openNoteId + '"]');
-        if (input) input.focus();
-      }
-      return;
-    }
   }
 
   els.taskList.addEventListener('click', onTaskClick);
@@ -1097,17 +1040,6 @@
     });
     input.addEventListener('blur', function () { done(true); });
   }
-
-  document.addEventListener('input', function (e) {
-    var t = e.target as HTMLTextAreaElement;
-    if (t.matches('[data-note-input]')) {
-      var task = today().tasks.find(function (x) { return x.id === t.dataset.noteInput; });
-      if (task) {
-        setNotes(task.id, t.value);
-        save();
-      }
-    }
-  });
 
   els.carryToggle.addEventListener('click', function () {
     carryOpen = !carryOpen;

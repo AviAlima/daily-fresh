@@ -12,7 +12,7 @@ global.window = { addEventListener() {} };
 const S = require('../dist/sync.js');
 
 const T = (id, text, ts) => ({
-  id, text, done: false, priority: 0, notes: '', estimate: 0,
+  id, text, done: false, estimate: 0,
   carriedFrom: null, created: new Date().toISOString(), doneAt: null, ts: ts || {}
 });
 

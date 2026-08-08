@@ -11,8 +11,6 @@ interface TaskShape {
   id: string;
   text: string;
   done: boolean;
-  priority: number;
-  notes: string;
   estimate: number;
   order: number;
   carriedFrom: CarriedFrom | null;
