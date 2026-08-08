@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v21';
+  var APP_VERSION = 'v22';
 
   var state = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -460,7 +460,10 @@
     syncPairWrap: $('syncPairWrap'),
     syncInput: $('syncInput'),
     syncPairBtn: $('syncPairBtn'),
-    syncUnpair: $('syncUnpair')
+    syncUnpair: $('syncUnpair'),
+    viewLogBtn: $('viewLogBtn'),
+    copyLogBtn: $('copyLogBtn'),
+    syncLogView: $('syncLogView')
   };
 
   /* ================= Sounds ================= */
@@ -1296,6 +1299,46 @@
     toast('Sync stopped');
   });
 
+  function currentSyncLog() {
+    return (window.Sync && window.Sync.getLog) ? window.Sync.getLog() : [];
+  }
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    done(ok);
+  }
+
+  els.copyLogBtn.addEventListener('click', function () {
+    var text = JSON.stringify(currentSyncLog(), null, 2);
+    function done(ok) { toast(ok ? 'Sync log copied' : 'Copy failed \u2014 select and copy manually'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  });
+
+  els.viewLogBtn.addEventListener('click', function () {
+    var el = els.syncLogView;
+    var hidden = el.classList.toggle('hidden');
+    els.viewLogBtn.textContent = hidden ? 'View' : 'Hide';
+    if (!hidden) {
+      var lines = currentSyncLog().slice(-60).map(function (e) {
+        var d = new Date(e.t);
+        return d.toISOString().replace('T', ' ').slice(0, 19) + '  ' + e.type + '  ' + e.msg;
+      });
+      el.textContent = lines.length ? lines.join('\n') : '(no sync log entries yet)';
+    }
+  });
+
   $('resetDataBtn').addEventListener('click', function () {
     if (!confirm('Erase all tasks, notes and history? This cannot be undone.')) return;
     state = {
@@ -1510,6 +1553,7 @@
       var tasks = today().tasks;
       tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
       tasks.forEach(function (t, i) { t.order = i; });
+      today().orderTs = Date.now();
       save();
       suppressClick = true;
     }

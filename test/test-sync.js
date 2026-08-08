@@ -128,6 +128,68 @@ check('pushDay includes tombstones', () => {
   assert.equal(doc.tombstones.length, 1);
 });
 
+console.log('orderTs: reorder sync');
+check('newer remote orderTs adopts remote order', () => {
+  const mk = (tasks, orderTs) => ({
+    tasks: tasks, tombstones: [], note: '', fieldTs: {}, orderTs
+  });
+  const local = mk([
+    Object.assign(T('a', 'x', {}), { order: 0 }),
+    Object.assign(T('b', 'y', {}), { order: 1 }),
+    Object.assign(T('c', 'z', {}), { order: 2 })
+  ], 1000);
+  const remote = mk([
+    Object.assign(T('c', 'z', {}), { order: 0 }),
+    Object.assign(T('a', 'x', {}), { order: 1 }),
+    Object.assign(T('b', 'y', {}), { order: 2 })
+  ], 2000);
+  const m = S.mergeDay(local, remote);
+  assert.deepEqual(m.day.tasks.map(t => t.id), ['c', 'a', 'b']);
+  assert.equal(m.day.orderTs, 2000);
+  assert.equal(m.changed, true);
+});
+check('older remote orderTs is ignored', () => {
+  const local = {
+    tasks: [Object.assign(T('a', 'x', {}), { order: 0 })],
+    tombstones: [], note: '', fieldTs: {}, orderTs: 2000
+  };
+  const remote = {
+    tasks: [Object.assign(T('a', 'x', {}), { order: 1 })],
+    tombstones: [], note: '', fieldTs: {}, orderTs: 1000
+  };
+  const m = S.mergeDay(local, remote);
+  assert.equal(m.day.orderTs, 2000);
+  assert.equal(m.changed, false);
+});
+check('pushDay: only reorderer stamps order ts', () => {
+  const now = 9000;
+  const local = {
+    tasks: [Object.assign(T('a', 'x', {}), { order: 1, ts: { order: 1000 } })],
+    tombstones: [], note: '', fieldTs: {}, orderTs: 5000
+  };
+  const remote = {
+    orderTs: 3000,
+    tasks: [Object.assign(T('a', 'x', {}), { order: 0, ts: { order: 3000 } })]
+  };
+  const doc = S.pushDay(local, remote, now);
+  assert.equal(doc.tasks[0].ts.order, now);
+  assert.equal(doc.orderTs, 5000);
+});
+check('pushDay: non-reorderer preserves remote order ts', () => {
+  const now = 9000;
+  const local = {
+    tasks: [Object.assign(T('a', 'x', {}), { order: 1, ts: { order: 1000 } })],
+    tombstones: [], note: '', fieldTs: {}, orderTs: 3000
+  };
+  const remote = {
+    orderTs: 5000,
+    tasks: [Object.assign(T('a', 'x', {}), { order: 0, ts: { order: 5000 } })]
+  };
+  const doc = S.pushDay(local, remote, now);
+  assert.equal(doc.tasks[0].ts.order, 5000);
+  assert.equal(doc.orderTs, 5000);
+});
+
 console.log('readLocalMeta: tomorrow LWW inference');
 check('equal tomorrow keeps remote ts, differing stamps now', () => {
   global.localStorage.setItem('daily-fresh-sync-v1', JSON.stringify({ code: 'ABC', hash: S.hashCode('ABC'), paired: true }));

@@ -138,6 +138,7 @@
   function normDay(d) {
     if (!d.tombstones) d.tombstones = [];
     if (!d.fieldTs) d.fieldTs = {};
+    if (!d.orderTs) d.orderTs = 0;
     (d.tasks || []).forEach(function (t) { if (!t.ts) t.ts = {}; });
     return d;
   }
@@ -202,7 +203,8 @@
       focus: local.focus || null,
       reflection: local.reflection || '',
       tombstones: mergeTombstones(local.tombstones, remote.tombstones),
-      fieldTs: copyObj(local.fieldTs || {})
+      fieldTs: copyObj(local.fieldTs || {}),
+      orderTs: local.orderTs || 0
     };
     var rft = remote.fieldTs || {};
     ['note', 'focus', 'reflection'].forEach(function (f) {
@@ -243,6 +245,19 @@
     day.tasks = pruned;
     if (day.focus && !pruned.some(function (t) { return t.id === day.focus; })) {
       day.focus = null;
+      changed = true;
+    }
+    if ((remote.orderTs || 0) > day.orderTs) {
+      var pos = {};
+      (remote.tasks || []).forEach(function (rt, i) { pos[rt.id] = i; });
+      day.tasks.sort(function (a, b) {
+        var pa = pos[a.id], pb = pos[b.id];
+        if (pa === undefined && pb === undefined) return 0;
+        if (pa === undefined) return 1;
+        if (pb === undefined) return -1;
+        return pa - pb;
+      });
+      day.orderTs = remote.orderTs;
       changed = true;
     }
     return { day: day, changed: changed };
@@ -308,10 +323,24 @@
   function pushDay(day, remote, now) {
     var rtsMap = {};
     ((remote && remote.tasks) || []).forEach(function (rt) { rtsMap[rt.id] = rt; });
+    var localOrderTs = day.orderTs || 0;
+    var remoteOrderTs = (remote && remote.orderTs) || 0;
     var tasks = (day.tasks || []).map(function (t) {
       var rt = rtsMap[t.id];
       var ts = copyObj(t.ts || {});
       FIELDS.forEach(function (f) {
+        if (f === 'order') {
+          if (rt && deepEq(t[f], rt[f])) {
+            if (!ts[f]) ts[f] = (rt.ts && rt.ts[f]) || now;
+          } else if (localOrderTs > remoteOrderTs) {
+            ts[f] = now;
+          } else if (rt) {
+            ts[f] = (rt.ts && rt.ts[f]) || now;
+          } else {
+            ts[f] = now;
+          }
+          return;
+        }
         if (rt && deepEq(t[f], rt[f])) {
           if (!ts[f]) ts[f] = (rt.ts && rt.ts[f]) || now;
         } else {
@@ -328,7 +357,8 @@
       note: day.note || '',
       focus: day.focus || null,
       reflection: day.reflection || '',
-      fieldTs: copyObj(day.fieldTs || {})
+      fieldTs: copyObj(day.fieldTs || {}),
+      orderTs: Math.max(localOrderTs, remoteOrderTs)
     };
     ['note', 'focus', 'reflection'].forEach(function (f) {
       if (remote && deepEq(day[f] || '', remote[f] || '')) {

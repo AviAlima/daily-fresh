@@ -1205,6 +1205,23 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 .timer-btn.primary:hover { background: var(--accent-hi); }
 .timer-btn.primary.running { background: var(--orange); border-color: var(--orange); }
 
+/* ---------- Sync log ---------- */
+.log-view {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 0 0 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 /* ---------- Onboarding ---------- */
 .onboard { padding: 32px 30px 30px; max-width: 430px; }
 

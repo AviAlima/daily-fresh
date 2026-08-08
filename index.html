@@ -273,6 +273,18 @@
 
       <div class="setting-row">
         <div class="setting-label">
+          <span>Sync log</span>
+          <span class="setting-sub">Last sync events — copy to share diagnostics</span>
+        </div>
+        <div class="sync-controls">
+          <button class="timer-btn" id="viewLogBtn">View</button>
+          <button class="timer-btn" id="copyLogBtn">Copy log</button>
+        </div>
+      </div>
+      <pre class="log-view hidden" id="syncLogView"></pre>
+
+      <div class="setting-row">
+        <div class="setting-label">
           <span>Backup</span>
           <span class="setting-sub">Export or restore your data as JSON</span>
         </div>
