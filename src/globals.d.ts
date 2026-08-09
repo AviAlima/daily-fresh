@@ -25,6 +25,12 @@ interface SyncApi {
   getLog(): SyncLogEntry[];
   isDirty(): boolean;
   getSyncError(): string | null;
+  getStatus(): {
+    state: 'off' | 'synced' | 'pending' | 'error' | 'stale';
+    lastContact: number;
+    dirty: boolean;
+    error: string | null;
+  };
   init(opts?: { onRemote?: () => void }): void;
   start(): Promise<unknown>;
   pair(code: string): Promise<unknown>;

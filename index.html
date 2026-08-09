@@ -47,7 +47,6 @@
         <p class="date" id="dayDate"></p>
       </div>
       <div class="top-right">
-        <div class="clock" id="clock">--:--</div>
         <div class="progress">
           <span class="streak-pill hidden" id="streakPill"></span>
           <svg class="ring" viewBox="0 0 36 36">
@@ -56,11 +55,15 @@
           </svg>
           <span class="ring-count" id="ringCount"></span>
         </div>
+        <button class="sync-pill hidden" id="syncPill" title="Sync status">
+          <span class="sync-dot"></span>
+          <span class="sync-label" id="syncPillLabel"></span>
+        </button>
       </div>
     </header>
 
     <section class="view" id="todayView">
-      <div class="add-row">
+      <div class="add-row" id="addRow">
         <button class="add-btn" id="addBtn" title="Add task (Enter)">+</button>
         <input id="taskInput" type="text" dir="auto" placeholder="Add a task, press Enter" autocomplete="off">
       </div>

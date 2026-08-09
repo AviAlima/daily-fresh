@@ -38,6 +38,23 @@ let dirty = false;
 let syncError: string | null = null;
 let Sync: any = { online: true };
 
+/* ================= Server contact tracking ================= */
+
+const STALE_MS = 60000;
+const HEARTBEAT_MS = 30000;
+let lastContact = 0;
+let pendingSyncWrites = false;
+
+function touch(): void {
+  lastContact = Date.now();
+  notifyStatus();
+}
+
+function heartbeat(): void {
+  if (!isPaired() || !initialized) return;
+  metaRef.get({ source: 'server' }).then(() => { touch(); }).catch(() => { notifyStatus(); });
+}
+
 /* ================= Hash ================= */
 
 function cyrb53(str: string, seed: number): string {
@@ -454,6 +471,7 @@ function flush(): Promise<boolean> {
   return batch.commit().then(() => {
     dirty = false;
     syncError = null;
+    touch();
     logEvent('flush-ok', '');
     notifyStatus();
   }).catch((e: any) => {
@@ -491,6 +509,7 @@ function prime(): Promise<void> {
       remoteDays = {};
       qs.forEach((d: any) => { remoteDays[d.id] = d.data() as DayShape; });
       initialized = true;
+      touch();
       logEvent('prime', qs.size + ' day docs on server');
       applyRemote();
     });
@@ -502,6 +521,8 @@ function startListeners(): void {
   unsubs.push(daysCol.onSnapshot((snap: any) => {
     remoteDays = {};
     snap.forEach((d: any) => { remoteDays[d.id] = d.data() as DayShape; });
+    pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
+    if (!(snap.metadata && snap.metadata.fromCache)) touch();
     logEvent('snapshot-days', snap.size + ' docs');
     applyRemote();
   }, (err: any) => {
@@ -509,13 +530,15 @@ function startListeners(): void {
   }));
   unsubs.push(metaRef.onSnapshot((snap: any) => {
     remoteMeta = snap.exists ? snap.data() as RemoteMeta : null;
+    pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
+    if (!(snap.metadata && snap.metadata.fromCache)) touch();
     logEvent('snapshot-meta', snap.exists ? 'present' : 'absent');
     applyRemote();
   }, (err: any) => {
     logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
   }));
   try {
-    db.onSnapshotsInSync(function () { Sync.online = true; notifyStatus(); });
+    db.onSnapshotsInSync(function () { Sync.online = true; pendingSyncWrites = false; touch(); });
   } catch (e) {}
 }
 
@@ -580,6 +603,8 @@ function unpair(): void {
   remoteMeta = null;
   dirty = false;
   syncError = null;
+  lastContact = 0;
+  pendingSyncWrites = false;
   setSyncState(null);
   logEvent('unpair', '');
   notifyStatus();
@@ -617,6 +642,7 @@ function init(opts?: { onRemote?: () => void }): void {
     if (!document.hidden) retryFlush();
   });
   setInterval(() => { retryFlush(); }, 30000);
+  setInterval(heartbeat, HEARTBEAT_MS);
   notifyStatus();
 }
 
@@ -634,6 +660,16 @@ root.Sync = {
   getLog: readSyncLog,
   isDirty: () => dirty,
   getSyncError: () => syncError,
+  getStatus: () => {
+    const st = getSync();
+    if (!st || !st.paired || !db) return { state: 'off', lastContact, dirty, error: null };
+    if (syncError) return { state: 'error', lastContact, dirty, error: syncError };
+    if (Sync.online === false || !lastContact || Date.now() - lastContact > STALE_MS) {
+      return { state: 'stale', lastContact, dirty, error: null };
+    }
+    if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
+    return { state: 'synced', lastContact, dirty, error: null };
+  },
   init,
   start,
   pair,

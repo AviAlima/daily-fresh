@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v25';
+  var APP_VERSION = 'v26';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -400,10 +400,10 @@
   var els = {
     greeting: $('greeting'),
     dayDate: $('dayDate'),
-    clock: $('clock'),
     ringFg: $('ringFg'),
     ringCount: $('ringCount'),
     taskInput: $<HTMLInputElement>('taskInput'),
+    addRow: $('addRow'),
     taskList: $('taskList'),
     listHead: $('listHead'),
     listTitle: $('listTitle'),
@@ -446,6 +446,8 @@
     importFile: $<HTMLInputElement>('importFile'),
     syncRow: $('syncRow'),
     syncStatus: $('syncStatus'),
+    syncPill: $('syncPill'),
+    syncPillLabel: $('syncPillLabel'),
     syncStartWrap: $('syncStartWrap'),
     syncStart: $<HTMLButtonElement>('syncStart'),
     syncBody: $('syncBody'),
@@ -597,6 +599,28 @@
     }
   }
 
+  function renderSyncStatus() {
+    var pill = els.syncPill;
+    if (!pill || !window.Sync || !window.Sync.getStatus || !window.Sync.isConfigured()) return;
+    var st = window.Sync.getStatus();
+    if (st.state === 'off') { pill.classList.add('hidden'); return; }
+    pill.classList.remove('hidden');
+    var text = '';
+    if (st.state === 'synced') {
+      var s = Math.max(0, Math.round((Date.now() - st.lastContact) / 1000));
+      text = s < 2 ? 'Synced just now' : 'Synced ' + s + 's ago';
+    } else if (st.state === 'pending') {
+      text = 'Syncing\u2026';
+    } else if (st.state === 'error') {
+      text = 'Sync error';
+    } else {
+      text = 'Offline';
+    }
+    pill.classList.remove('synced', 'pending', 'error', 'stale');
+    pill.classList.add(st.state);
+    if (els.syncPillLabel.textContent !== text) els.syncPillLabel.textContent = text;
+  }
+
   function renderSync() {
     if (!els.syncRow || !window.Sync) return;
     if (!window.Sync.isConfigured()) {
@@ -617,16 +641,25 @@
       els.syncStatus.textContent = 'Link this device to your other one';
       return;
     }
-    var online = window.Sync.online !== false;
-    var syncErr = window.Sync.getSyncError ? window.Sync.getSyncError() : null;
-    if (syncErr) {
-      els.syncStatus.textContent = 'Sync failed \u2014 will retry';
-      els.syncStatus.classList.add('offline');
-    } else {
-      els.syncStatus.textContent = online
-        ? 'Syncing \u2014 connected'
-        : 'Offline \u2014 will sync when back online';
-      els.syncStatus.classList.toggle('offline', !online);
+    var st = window.Sync.getStatus ? window.Sync.getStatus() : null;
+    els.syncStatus.classList.remove('offline');
+    if (st) {
+      if (st.state === 'error') {
+        els.syncStatus.textContent = 'Sync failed \u2014 will retry';
+        els.syncStatus.classList.add('offline');
+      } else if (st.state === 'stale') {
+        els.syncStatus.textContent = st.dirty
+          ? 'Offline \u2014 changes saved locally, will sync'
+          : 'Offline \u2014 will sync when back online';
+        els.syncStatus.classList.add('offline');
+      } else if (st.state === 'pending') {
+        els.syncStatus.textContent = 'Syncing \u2014 sending your changes';
+      } else {
+        var s = Math.max(0, Math.round((Date.now() - st.lastContact) / 1000));
+        els.syncStatus.textContent = s < 2
+          ? 'Live \u2014 everything up to date'
+          : 'Live \u2014 last sync ' + s + 's ago';
+      }
     }
     var code = window.Sync.getCode();
     if (els.syncCode.textContent !== code) {
@@ -971,7 +1004,7 @@
     $(view + 'View').classList.remove('hidden');
     renderNavBadges();
     if (view === 'today') {
-      els.taskInput.focus();
+      focusTaskInput();
     } else if (view === 'history') {
       calView = currentMonth();
       renderCalendar();
@@ -981,6 +1014,8 @@
   document.querySelectorAll<HTMLElement>('.nav-btn').forEach(function (btn) {
     btn.addEventListener('click', function () { switchView(btn.dataset.view || 'today'); });
   });
+
+  els.syncPill.addEventListener('click', function () { switchView('settings'); });
 
   /* ================= Today events ================= */
 
@@ -992,7 +1027,21 @@
     els.taskInput.focus();
   }
 
-  $('addBtn').addEventListener('click', addCurrentTask);
+  function setAddExpanded(open: boolean) {
+    els.addRow.classList.toggle('expanded', open);
+    if (!open) dismissKeyboard();
+  }
+
+  function focusTaskInput() {
+    setAddExpanded(true);
+    els.taskInput.focus();
+  }
+
+  $('addBtn').addEventListener('click', function () {
+    if (!isTouchScreen()) { addCurrentTask(); return; }
+    if (els.addRow.classList.contains('expanded')) setAddExpanded(false);
+    else focusTaskInput();
+  });
 
   els.taskInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') addCurrentTask();
@@ -1406,13 +1455,17 @@
   window.addEventListener('pointerup', function () { if (!dragIsTouch) endDrag(true); });
   window.addEventListener('pointercancel', function () { if (!dragIsTouch) endDrag(false); });
 
-  // ----- Touch: native touch events (long-press anywhere on a task) -----
-  // iOS/WKWebView claims touch gestures (scroll, text selection, callouts)
-  // and cancels the pointer stream. The reliable combo is touch-action:none
-  // plus preventDefault on a non-passive touchstart, then driving the drag
-  // from touchmove/touchend directly. Works in Safari and standalone PWA.
+  // ----- Touch: native touch events (long-press 1.25s anywhere on a task to drag) -----
+  // Swiping (vertical move) scrolls the page; only a stationary long-press starts a drag.
+  // iOS/WKWebView claims touch gestures (scroll, text selection, callouts) and cancels
+  // the pointer stream, so we drive the drag from native touch events directly.
+
+  function isTouchScreen() {
+    return window.matchMedia('(hover: none)').matches;
+  }
 
   els.taskList.addEventListener('touchstart', function (e) {
+    if (document.body.classList.contains('keyboard-open')) dismissKeyboard();
     var t = e.target as HTMLElement | null;
     if (!t) return;
     var li = t.closest<HTMLElement>('.task:not(.done)') as HTMLElement;
@@ -1421,21 +1474,21 @@
     var tt = e.touches[0];
     pressOrigin = { x: tt.clientX, y: tt.clientY };
     clearTimeout(touchTimer ?? undefined);
-    touchTimer = setTimeout(function () { beginDrag(li, true); }, 300);
+    touchTimer = setTimeout(function () { beginDrag(li, true); }, 1250);
   }, { passive: false });
 
   els.taskList.addEventListener('touchmove', function (e) {
-    if (e.cancelable) e.preventDefault();
     var t = e.touches[0];
     if (!t) return;
-    if (!dragState) {
-      if (pressOrigin && (Math.abs(t.clientX - pressOrigin.x) > 10 || Math.abs(t.clientY - pressOrigin.y) > 10)) {
-        clearTimeout(touchTimer ?? undefined);
-        pressOrigin = null;
-      }
+    if (dragState) {
+      if (e.cancelable) e.preventDefault();
+      applyDrag(t.clientX, t.clientY);
       return;
     }
-    applyDrag(t.clientX, t.clientY);
+    if (pressOrigin && (Math.abs(t.clientX - pressOrigin.x) > 10 || Math.abs(t.clientY - pressOrigin.y) > 10)) {
+      clearTimeout(touchTimer ?? undefined);
+      pressOrigin = null;
+    }
   }, { passive: false });
 
   els.taskList.addEventListener('touchend', function () {
@@ -1676,7 +1729,7 @@
     $('onboardModal').classList.add('hidden');
     lastGreeting = '';
     render();
-    els.taskInput.focus();
+    focusTaskInput();
     toast('Welcome' + (name ? ', ' + name : '') + ' \u2014 a fresh page awaits');
   });
 
@@ -1686,7 +1739,7 @@
     if (e.key === '/' && !isTyping(e.target)) {
       e.preventDefault();
       switchView('today');
-      els.taskInput.focus();
+      focusTaskInput();
     }
     if (e.key === 'Escape') {
       if (!$('focusModal').classList.contains('hidden')) closeFocusModal();
@@ -1709,6 +1762,39 @@
     document.body.classList.toggle('keyboard-open', open);
     return open;
   }
+
+  function dismissKeyboard() {
+    var ae = document.activeElement as HTMLElement | null;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
+  }
+
+  /* ================= Idle auto-scroll (mobile) ================= */
+
+  var idleTimer: number | null = null;
+  var idleCollapsed = false;
+
+  function resetIdleTimer() {
+    clearTimeout(idleTimer ?? undefined);
+    idleTimer = setTimeout(function () {
+      if (!isTouchScreen() || currentView !== 'today') return;
+      if (document.body.classList.contains('keyboard-open')) return;
+      idleCollapsed = true;
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    }, 5000);
+  }
+
+  document.addEventListener('touchstart', function () {
+    if (idleCollapsed) {
+      idleCollapsed = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    resetIdleTimer();
+  }, { passive: true });
+
+  window.addEventListener('scroll', function () {
+    if (idleCollapsed) return;
+    resetIdleTimer();
+  }, { passive: true });
 
   function bringFocusedIntoView(el: Element | null) {
     if (!document.body.classList.contains('keyboard-open')) return;
@@ -1800,13 +1886,9 @@
   /* ================= Clock & rollover ================= */
 
   function tick() {
-    var now = new Date();
-    var time = pad(now.getHours()) + ':' + pad(now.getMinutes());
-    if (els.clock.textContent !== time) {
-      els.clock.textContent = time;
-      var g = greeting();
-      if (g !== lastGreeting) { els.greeting.textContent = g; lastGreeting = g; }
-    }
+    var g = greeting();
+    if (g !== lastGreeting) { els.greeting.textContent = g; lastGreeting = g; }
+    renderSyncStatus();
     var key = currentDayKey();
     if (key !== activeDay) ensureDay();
   }
@@ -1829,10 +1911,11 @@
   var versionEl = $('appVersion');
   if (versionEl) versionEl.textContent = APP_VERSION;
   if (!state.onboarded) openOnboarding();
-  else els.taskInput.focus();
+  else focusTaskInput();
   if (window.Sync) {
-    window.Sync.onStatus(function () { renderSync(); });
+    window.Sync.onStatus(function () { renderSync(); renderSyncStatus(); });
     window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });
   }
+  resetIdleTimer();
   tick();
 })();
