@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v26';
+  var APP_VERSION = 'v27';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -607,8 +607,7 @@
     pill.classList.remove('hidden');
     var text = '';
     if (st.state === 'synced') {
-      var s = Math.max(0, Math.round((Date.now() - st.lastContact) / 1000));
-      text = s < 2 ? 'Synced just now' : 'Synced ' + s + 's ago';
+      text = 'Synced';
     } else if (st.state === 'pending') {
       text = 'Syncing\u2026';
     } else if (st.state === 'error') {
@@ -655,10 +654,7 @@
       } else if (st.state === 'pending') {
         els.syncStatus.textContent = 'Syncing \u2014 sending your changes';
       } else {
-        var s = Math.max(0, Math.round((Date.now() - st.lastContact) / 1000));
-        els.syncStatus.textContent = s < 2
-          ? 'Live \u2014 everything up to date'
-          : 'Live \u2014 last sync ' + s + 's ago';
+        els.syncStatus.textContent = 'Live \u2014 everything up to date';
       }
     }
     var code = window.Sync.getCode();
