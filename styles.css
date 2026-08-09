@@ -1559,6 +1559,8 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   }
 
   .add-row.expanded {
+    left: 18px;
+    right: 18px;
     width: auto;
     border-radius: 14px;
     background: var(--card);
