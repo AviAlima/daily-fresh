@@ -44,9 +44,9 @@ interface SettingsShape {
 interface AppState {
   settings: SettingsShape;
   days: Record<string, DayShape>;
-  tomorrow: { id: string; text: string }[];
   onboarded: boolean;
   activeDay?: string;
+  tomorrow?: { id: string; text: string }[];
   tomorrowTs?: number;
   nameTs?: number;
   resetHourTs?: number;

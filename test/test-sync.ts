@@ -212,7 +212,7 @@ check('equal tomorrow keeps remote ts, differing stamps now', () => {
   const remoteMeta = rm({ owner: S.hashCode('ABC'), name: '', nameTs: 1000, tomorrow: [{ id: 't1', text: 'plan' }], tomorrowTs: 1000 });
   const m1 = S.readLocalMeta(state, 5000, remoteMeta);
   assert.equal(m1.tomorrowTs, 1000);
-  state.tomorrow[0].text = 'changed plan';
+  state.tomorrow![0].text = 'changed plan';
   const m2 = S.readLocalMeta(state, 5000);
   assert.equal(m2.tomorrowTs, 5000);
 });

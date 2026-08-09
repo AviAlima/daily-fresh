@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v29';
+  var APP_VERSION = 'v30';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -62,7 +62,6 @@
     return {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
-      tomorrow: [],
       onboarded: false
     };
   }
@@ -71,7 +70,6 @@
     var s: AppState = {
       settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
-      tomorrow: [],
       onboarded: true
     };
     if (p.settings) {
@@ -80,7 +78,6 @@
       if (typeof p.settings.sound === 'boolean') s.settings.sound = p.settings.sound;
       if (p.settings.name) s.settings.name = p.settings.name;
     }
-    if (Array.isArray(p.tomorrow)) s.tomorrow = p.tomorrow;
     Object.keys(p.days || {}).forEach(function (k) {
       var raw = p.days[k];
       if (!raw || typeof raw !== 'object') return;
@@ -181,16 +178,9 @@
     activeDay = key;
     state.activeDay = key;
     if (!state.days[key]) state.days[key] = newDayObj();
-    var planned = state.tomorrow || [];
-    if (planned.length) {
-      state.tomorrow = [];
-      state.days[key].tasks = planned.map(function (t, i) {
-        return { id: t.id || uid(), text: t.text, done: false, estimate: parseEstimate(t.text), carriedFrom: null, order: i, created: new Date().toISOString(), doneAt: null, ts: null };
-      });
-    }
     save();
     if (!silent) {
-      toast(isFirstDay() ? 'Welcome — your page is fresh' : (planned.length ? 'A new day \u2014 your planned tasks are ready' : 'A new day has begun'));
+      toast(isFirstDay() ? 'Welcome — your page is fresh' : 'A new day has begun');
     }
     render();
   }
@@ -424,9 +414,6 @@
     carryToggle: $('carryToggle'),
     noteInput: $<HTMLTextAreaElement>('noteInput'),
     streakPill: $('streakPill'),
-    tomorrowInput: $<HTMLInputElement>('tomorrowInput'),
-    tomorrowAddBtn: $<HTMLButtonElement>('tomorrowAddBtn'),
-    tomorrowList: $('tomorrowList'),
     historyList: $('historyList'),
     emptyHistory: $('emptyHistory'),
     recapCard: $('recapCard'),
@@ -710,7 +697,6 @@
     renderCarry();
     renderFocus();
     renderNote();
-    renderTomorrow();
   }
 
   function greeting() {
@@ -760,20 +746,6 @@
     if (document.activeElement !== els.reflectionInput) {
       els.reflectionInput.value = reflection;
     }
-  }
-
-  function renderTomorrow() {
-    var list = state.tomorrow || [];
-    els.tomorrowList.classList.toggle('hidden', !list.length);
-    els.tomorrowList.innerHTML = list.map(function (t) {
-      return (
-        '<li class="tomorrow-item" data-id="' + t.id + '">' +
-        '<button class="t-check" data-t-done="' + t.id + '" title="Remove" aria-label="Remove from tomorrow">' + checkSvg() + '</button>' +
-        '<span class="tomorrow-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
-        '<button class="icon-btn del" data-t-del="' + t.id + '" title="Delete">' + xIcon() + '</button>' +
-        '</li>'
-      );
-    }).join('');
   }
 
   /* ================= Stats ================= */
@@ -1136,48 +1108,6 @@
     noteSaveTimer = setTimeout(save, 350);
   });
 
-  /* ================= Tomorrow ================= */
-
-  function addTomorrow() {
-    var text = els.tomorrowInput.value.trim();
-    if (!text) return;
-    if (!state.tomorrow) state.tomorrow = [];
-    text.split(/\r?\n/).forEach(function (line) {
-      if (line.trim()) state.tomorrow.push({ id: uid(), text: line.trim() });
-    });
-    els.tomorrowInput.value = '';
-    save();
-    renderToday();
-    els.tomorrowInput.focus();
-    toast('Planned for tomorrow');
-  }
-
-  els.tomorrowAddBtn.addEventListener('click', addTomorrow);
-
-  els.tomorrowInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') addTomorrow();
-  });
-
-  els.tomorrowList.addEventListener('click', function (e) {
-    var t = e.target as HTMLElement | null;
-    if (!t) return;
-    var doneBtn = t.closest<HTMLElement>('[data-t-done]') as HTMLElement;
-    if (doneBtn) {
-      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== (doneBtn.dataset.tDone || ''); });
-      save();
-      renderToday();
-      toast('Removed from tomorrow');
-      return;
-    }
-    var delBtn = t.closest<HTMLElement>('[data-t-del]') as HTMLElement;
-    if (delBtn) {
-      state.tomorrow = (state.tomorrow || []).filter(function (t) { return t.id !== (delBtn.dataset.tDel || ''); });
-      save();
-      renderToday();
-      toast('Removed from tomorrow');
-    }
-  });
-
   /* ================= History events ================= */
 
   els.historyList.addEventListener('click', function (e) {
@@ -1349,7 +1279,6 @@
     state = {
       settings: state.settings,
       days: {},
-      tomorrow: [],
       onboarded: true
     };
     activeDay = currentDayKey();
