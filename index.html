@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#151a21">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily Fresh">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Daily Fresh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-dot"></span>Daily Fresh</div>
+    <div class="nav-group">
+      <button class="nav-btn active" data-view="today" id="navToday">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        Today
+      </button>
+      <button class="nav-btn" data-view="history" id="navHistory">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13a9 9 0 1 0 2.5-7.3L3 8"/></svg>
+        History
+      </button>
+    </div>
+    <div class="nav-group sidebar-foot">
+      <div class="version-tag" id="appVersion" title="App version"></div>
+      <button class="nav-btn" data-view="settings" id="navSettings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="greeting">Good morning</h1>
+        <p class="date" id="dayDate"></p>
+      </div>
+      <div class="top-right">
+        <div class="progress">
+          <span class="streak-pill hidden" id="streakPill"></span>
+          <svg class="ring" viewBox="0 0 36 36">
+            <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+            <circle class="ring-fg" id="ringFg" cx="18" cy="18" r="15.9" stroke-dasharray="100" stroke-dashoffset="100"/>
+          </svg>
+          <span class="ring-count" id="ringCount"></span>
+        </div>
+        <button class="sync-pill hidden" id="syncPill" title="Sync status">
+          <span class="sync-dot"></span>
+          <span class="sync-label" id="syncPillLabel"></span>
+        </button>
+      </div>
+    </header>
+
+    <section class="view" id="todayView">
+      <div class="add-row" id="addRow">
+        <button class="add-btn" id="addBtn" title="Add task (Enter)">+</button>
+        <input id="taskInput" type="text" dir="auto" placeholder="Add a task, press Enter" autocomplete="off">
+      </div>
+
+      <div class="focus-card hidden" id="focusCard">
+        <div class="focus-head">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l4.5-4.5"/></svg>
+          Today's focus
+          <button class="focus-clear" id="focusClear" title="Clear focus">Clear</button>
+        </div>
+        <div class="focus-body">
+          <span class="focus-task-text" id="focusTaskText" dir="auto"></span>
+          <button class="focus-start" id="focusStartBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Start 25 min session
+          </button>
+        </div>
+      </div>
+
+      <div class="carry hidden" id="carryWrap">
+        <div class="carry-header" id="carryToggle">
+          <span class="chevron">&#9654;</span>
+          Unfinished from previous days
+          <span class="carry-count" id="carryCount"></span>
+          <button class="carry-all" id="carryAll">Bring all</button>
+        </div>
+        <div class="carry-list" id="carryList"></div>
+      </div>
+
+      <div class="list-head" id="listHead">
+        <span id="listTitle">Tasks</span>
+        <span class="list-sub" id="listSub"></span>
+      </div>
+
+      <ul class="task-list" id="taskList"></ul>
+
+      <div class="empty" id="emptyToday">
+        <div class="empty-sun">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+        </div>
+        <h3>A blank page</h3>
+        <p>Start fresh. Add what matters today.</p>
+      </div>
+
+      <div class="done-wrap hidden" id="doneWrap">
+        <button class="done-toggle" id="doneToggle">
+          <span class="chevron">&#9654;</span>
+          Completed <span id="doneCount"></span>
+        </button>
+        <ul class="task-list done-list" id="doneList"></ul>
+      </div>
+
+      <div class="day-complete hidden" id="dayCompleteCard">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <div>
+          <div class="day-complete-title">Day complete</div>
+          <div class="day-complete-sub">Everything is done. Enjoy the rest of today.</div>
+        </div>
+      </div>
+
+      <div class="reflection-card hidden" id="reflectionCard">
+        <div class="reflection-head">What went well today?</div>
+        <textarea id="reflectionInput" rows="2" dir="auto" placeholder="One small win, one good moment..."></textarea>
+      </div>
+
+      <div class="note-card">
+        <div class="note-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          Notes for today
+        </div>
+        <textarea id="noteInput" placeholder="Brain dumps, thoughts, context for this day..." rows="3" dir="auto"></textarea>
+      </div>
+
+      <div class="tomorrow-card">
+        <div class="tomorrow-add">
+          <input id="tomorrowInput" type="text" dir="auto" placeholder="Plan tomorrow..." autocomplete="off">
+          <button class="tomorrow-add-btn" id="tomorrowAddBtn" title="Add to tomorrow">+</button>
+        </div>
+        <ul class="tomorrow-list hidden" id="tomorrowList"></ul>
+      </div>
+
+      <p class="kbd-hint">Press <kbd>/</kbd> to add a task</p>
+    </section>
+
+    <section class="view hidden" id="historyView">
+      <h2 class="view-title">History</h2>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value" id="statStreak">0</div>
+          <div class="stat-label">Day streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statDone">0</div>
+          <div class="stat-label">Tasks completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statRate">0%</div>
+          <div class="stat-label">7-day rate</div>
+        </div>
+      </div>
+
+      <div class="recap-card hidden" id="recapCard">
+        <div class="recap-line" id="recapLine"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">Last 7 days</div>
+        <div class="chart" id="weekChart"></div>
+      </div>
+
+      <div class="calendar-card">
+        <div class="calendar-head">
+          <button class="cal-nav" id="calPrev" title="Previous month">&#8249;</button>
+          <span class="cal-title" id="calTitle"></span>
+          <button class="cal-nav" id="calNext" title="Next month">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend">
+          <span><i class="lg lg-all"></i>all done</span>
+          <span><i class="lg lg-part"></i>some done</span>
+          <span><i class="lg lg-none"></i>nothing</span>
+        </div>
+      </div>
+
+      <div id="historyList"></div>
+      <div class="empty" id="emptyHistory">
+        <div class="empty-sun">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+        </div>
+        <h3>No history yet</h3>
+        <p>Past days will appear here. Nothing is ever lost.</p>
+      </div>
+    </section>
+
+    <section class="view hidden" id="settingsView">
+      <h2 class="view-title">Settings</h2>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Your name</span>
+          <span class="setting-sub">Used in the daily greeting</span>
+        </div>
+        <input type="text" id="nameInput" class="text-input" dir="auto" placeholder="e.g. Avi" maxlength="24">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>New day starts at</span>
+          <span class="setting-sub">Your page resets fresh at this hour</span>
+        </div>
+        <select id="resetHour"></select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Appearance</span>
+          <span class="setting-sub">Color theme</span>
+        </div>
+        <select id="themeSelect">
+          <option value="system">System</option>
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Sounds</span>
+          <span class="setting-sub">Completion chime and focus bell</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="soundToggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row hidden" id="installRow">
+        <div class="setting-label">
+          <span>Install app</span>
+          <span class="setting-sub">Add Daily Fresh to your home screen</span>
+        </div>
+        <button class="timer-btn primary" id="installBtn">Install</button>
+      </div>
+
+      <div class="setting-row sync-row" id="syncRow">
+        <div class="setting-label">
+          <span>Sync</span>
+          <span class="setting-sub" id="syncStatus"></span>
+        </div>
+        <div class="sync-controls">
+          <div id="syncStartWrap">
+            <button class="timer-btn primary" id="syncStart">Start sync</button>
+          </div>
+          <div class="sync-enter-row" id="syncPairWrap">
+            <input type="text" id="syncInput" class="text-input" dir="ltr" autocomplete="off"
+                   placeholder="Enter code from another device">
+            <button class="timer-btn" id="syncPairBtn">Pair</button>
+          </div>
+          <div class="hidden" id="syncBody">
+            <div class="sync-code-row">
+              <code id="syncCode" dir="ltr"></code>
+              <button class="icon-btn" id="syncCopy" title="Copy code">copy</button>
+            </div>
+            <div class="sync-qr hidden" id="syncQr"></div>
+            <button class="danger-btn sync-unpair" id="syncUnpair">Stop syncing</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Sync log</span>
+          <span class="setting-sub">Last sync events — copy to share diagnostics</span>
+        </div>
+        <div class="sync-controls">
+          <button class="timer-btn" id="viewLogBtn">View</button>
+          <button class="timer-btn" id="copyLogBtn">Copy log</button>
+        </div>
+      </div>
+      <pre class="log-view hidden" id="syncLogView"></pre>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Backup</span>
+          <span class="setting-sub">Export or restore your data as JSON</span>
+        </div>
+        <div class="backup-btns">
+          <button class="timer-btn" id="exportBtn">Export</button>
+          <button class="timer-btn" id="importBtn">Import</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Data</span>
+          <span class="setting-sub">Erase all tasks, notes and history</span>
+        </div>
+        <button class="danger-btn" id="resetDataBtn">Erase everything</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-backdrop hidden" id="focusModal">
+  <div class="modal focus-modal">
+    <button class="modal-close" id="focusClose" aria-label="Close">&times;</button>
+    <div class="focus-title">Focus session</div>
+    <div class="focus-task-name" id="focusTaskName"></div>
+    <div class="timer">
+      <svg class="timer-ring" viewBox="0 0 140 140">
+        <circle class="timer-bg" cx="70" cy="70" r="62"/>
+        <circle class="timer-fg" cx="70" cy="70" r="62"/>
+      </svg>
+      <div class="timer-time" id="timerTime">25:00</div>
+    </div>
+    <div class="timer-presets" id="timerPresets">
+      <button data-min="15">15 min</button>
+      <button data-min="25" class="active">25 min</button>
+      <button data-min="45">45 min</button>
+    </div>
+    <div class="timer-controls">
+      <button class="timer-btn primary" id="timerStart">Start</button>
+      <button class="timer-btn" id="timerReset">Reset</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="onboardModal">
+  <div class="modal onboard">
+    <div class="onboard-logo"><span class="brand-dot"></span>Daily Fresh</div>
+    <h2>A fresh page, every day</h2>
+    <ul class="onboard-list">
+      <li>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6.3 6.3l2 2M15.7 15.7l2 2M17.7 6.3l-2 2M8.3 15.7l-2 2"/><circle cx="12" cy="12" r="4"/></svg>
+        <div><strong>Your page resets at the hour you choose</strong><br>Fresh, empty, focused. Set it in Settings.</div>
+      </li>
+      <li>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div><strong>Nothing is ever lost</strong><br>Unfinished tasks move to History automatically.</div>
+      </li>
+      <li>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l4.5-4.5"/></svg>
+        <div><strong>Pick today's focus</strong><br>Star one task, start a 25-minute session.</div>
+      </li>
+    </ul>
+    <div class="onboard-name">
+      <label for="onboardName">What should we call you? <em>(optional)</em></label>
+      <input type="text" id="onboardName" dir="auto" placeholder="Your name" maxlength="24">
+    </div>
+    <button class="primary-big" id="onboardStart">Start fresh</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<script src="dist/firebase-config.js"></script>
+<script src="dist/sync.js"></script>
+<script src="dist/app.js"></script>
+</body>
+</html>
