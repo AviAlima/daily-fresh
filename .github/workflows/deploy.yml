@@ -3,9 +3,12 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
@@ -22,18 +25,17 @@ jobs:
           npm ci --ignore-scripts
           npm test
 
-      - name: Publish site to gh-pages branch
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stage site
         run: |
-          SITE_DIR="$RUNNER_TEMP/site"
-          mkdir -p "$SITE_DIR"
-          cp index.html styles.css manifest.json "$SITE_DIR/"
-          cp -r dist icons vendor "$SITE_DIR/"
-          touch "$SITE_DIR/.nojekyll"
-          cd "$SITE_DIR"
-          git init -q
-          git symbolic-ref HEAD refs/heads/gh-pages
-          git add -A
-          git -c user.name="Avi Alima" -c user.email="avi.alima@gmail.com" commit -q -m "Deploy: $GITHUB_SHA"
-          git push -q -f "https://x-access-token:${TOKEN}@github.com/$GITHUB_REPOSITORY.git" HEAD:gh-pages
+          mkdir -p "$RUNNER_TEMP/site"
+          cp index.html styles.css manifest.json "$RUNNER_TEMP/site/"
+          cp -r dist icons vendor "$RUNNER_TEMP/site/"
+          touch "$RUNNER_TEMP/site/.nojekyll"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "${{ runner.temp }}/site"
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
