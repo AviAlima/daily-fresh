@@ -265,4 +265,79 @@ check('readLocalMeta keeps remote ts when equal', () => {
   assert.equal(m.resetHourTs, 1000);
 });
 
+console.log('quarterKey');
+check('maps day keys to YYYY-Qn buckets', () => {
+  assert.equal(S.quarterKey('2026-08-10'), '2026-Q3');
+  assert.equal(S.quarterKey('2026-01-01'), '2026-Q1');
+  assert.equal(S.quarterKey('2026-03-31'), '2026-Q1');
+  assert.equal(S.quarterKey('2026-04-01'), '2026-Q2');
+  assert.equal(S.quarterKey('2025-12-31'), '2025-Q4');
+});
+
+console.log('isRecentDay');
+check('recent window = 31 days including today', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  assert.equal(S.isRecentDay('2026-08-10', now), true);
+  assert.equal(S.isRecentDay('2026-07-11', now), true);
+  assert.equal(S.isRecentDay('2026-07-10', now), false);
+  assert.equal(S.isRecentDay('2026-08-11', now), true);
+  assert.equal(S.isRecentDay('garbage', now), true);
+});
+
+console.log('buildOpen');
+check('keeps only recent window days', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const state = st({
+    days: {
+      '2026-08-10': day({ note: 'today' }),
+      '2026-07-01': day({ note: 'old' }),
+      '2026-01-15': day({ note: 'ancient' })
+    }
+  });
+  const open = S.buildOpen(state, now);
+  assert.deepEqual(Object.keys(open), ['2026-08-10']);
+});
+
+console.log('planMigration');
+check('recent to open, old to quarter archives', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const legacy = {
+    '2026-08-10': day({ note: 'today' }),
+    '2026-03-15': day({ note: 'q1' }),
+    '2026-04-20': day({ note: 'q2' }),
+    '2025-11-02': day({ note: 'old q4' })
+  };
+  const plan = S.planMigration(legacy, now);
+  assert.deepEqual(Object.keys(plan.openDays), ['2026-08-10']);
+  assert.deepEqual(Object.keys(plan.archives['2026-Q1']), ['2026-03-15']);
+  assert.deepEqual(Object.keys(plan.archives['2026-Q2']), ['2026-04-20']);
+  assert.deepEqual(Object.keys(plan.archives['2025-Q4']), ['2025-11-02']);
+  assert.ok(Array.isArray(plan.archives['2026-Q1']['2026-03-15'].tombstones));
+});
+
+console.log('planSweep');
+check('old changed day goes to its quarter; unchanged days skipped', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const local = day({ note: 'edited later', tasks: [T('a', 'task', { done: 1000 })], fieldTs: { note: 500 } });
+  const plan1 = S.planSweep(st({ days: { '2026-01-15': local } }), {}, now);
+  assert.deepEqual(Object.keys(plan1), ['2026-Q1']);
+  assert.ok(plan1['2026-Q1']['2026-01-15']);
+  const pushed = S.pushDay(local, null, now);
+  const plan2 = S.planSweep(st({ days: { '2026-01-15': local } }), { '2026-Q1': { '2026-01-15': pushed } }, now);
+  assert.deepEqual(plan2, {});
+});
+check('recent days are never swept', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const plan = S.planSweep(st({ days: { '2026-08-10': day({ note: 'x' }) } }), {}, now);
+  assert.deepEqual(plan, {});
+});
+
+console.log('readLocalMeta: schema stamp');
+check('meta always carries schema v3', () => {
+  (global as any).localStorage.setItem('daily-fresh-sync-v1', JSON.stringify({ code: 'ABC', hash: S.hashCode('ABC'), paired: true }));
+  const state = st({ settings: { name: '' }, tomorrow: [], tomorrowTs: 0, nameTs: 0 });
+  const m = S.readLocalMeta(state, 5000);
+  assert.equal(m.schema, 'v3');
+});
+
 console.log(pass + ' checks passed');

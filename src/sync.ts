@@ -11,6 +11,10 @@ interface SyncState {
   paired: boolean;
 }
 
+interface ArchiveMap {
+  [quarter: string]: Record<string, DayShape>;
+}
+
 const SYNC_KEY = 'daily-fresh-sync-v1';
 const STORAGE_KEY = 'daily-fresh-state-v2';
 const LOG_KEY = 'daily-fresh-sync-log-v1';
@@ -18,15 +22,21 @@ const MAX_LOG = 200;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIELDS: Array<'done' | 'text' | 'carriedFrom' | 'estimate' | 'order'> =
   ['done', 'text', 'carriedFrom', 'estimate', 'order'];
+const OPEN_DOC = 'open';
+const ARCHIVE_COL = 'archive';
+const RECENT_DAYS = 31;
+const DAY_MS = 86400000;
 
 let app: any = null;
 let auth: any = null;
 let db: any = null;
 let user: any = null;
 let metaRef: any = null;
-let daysCol: any = null;
+let openDoc: any = null;
+let archiveCol: any = null;
 let unsubs: Array<() => void> = [];
-let remoteDays: Record<string, DayShape> = {};
+let remoteOpenDays: Record<string, DayShape> = {};
+let remoteArchives: ArchiveMap = {};
 let remoteMeta: RemoteMeta | null = null;
 let pushTimer: number | null = null;
 let initialized = false;
@@ -316,7 +326,83 @@ function mergeMeta(state: AppState, rm: RemoteMeta): { tomorrow: { id: string; t
   return { tomorrow, changed };
 }
 
+/* ================= V3 layout helpers ================= */
+
+function dayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dd;
+}
+
+function quarterKey(day: string): string {
+  const y = day.slice(0, 4);
+  const m = parseInt(day.slice(5, 7), 10);
+  return y + '-Q' + (Math.floor((m - 1) / 3) + 1);
+}
+
+function isRecentDay(day: string, now: number): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return true;
+  const begin = new Date(now - (RECENT_DAYS - 1) * DAY_MS);
+  return day >= dayKey(begin);
+}
+
+function buildOpen(state: AppState, now: number): Record<string, DayShape> {
+  const out: Record<string, DayShape> = {};
+  Object.keys(state.days || {}).forEach((k) => {
+    if (isRecentDay(k, now)) out[k] = normDay(state.days[k]);
+  });
+  return out;
+}
+
+function planSweep(state: AppState, remoteArchivesIn: ArchiveMap, now: number): ArchiveMap {
+  const plan: ArchiveMap = {};
+  Object.keys(state.days || {}).forEach((k) => {
+    if (isRecentDay(k, now)) return;
+    const local = normDay(state.days[k]);
+    const q = quarterKey(k);
+    const arch = remoteArchivesIn[q] || {};
+    const remoteDay = arch[k];
+    const pushDoc = pushDay(local, remoteDay || null, now);
+    if (!remoteDay || !deepEq(pushDoc, remoteDay)) {
+      if (!plan[q]) plan[q] = {};
+      plan[q][k] = pushDoc;
+    }
+  });
+  return plan;
+}
+
+function planMigration(legacyDays: Record<string, DayShape>, now: number): {
+  openDays: Record<string, DayShape>;
+  archives: ArchiveMap;
+} {
+  const openDays: Record<string, DayShape> = {};
+  const archives: ArchiveMap = {};
+  Object.keys(legacyDays || {}).forEach((k) => {
+    const day = normDay(legacyDays[k]);
+    if (isRecentDay(k, now)) {
+      openDays[k] = day;
+    } else {
+      const q = quarterKey(k);
+      if (!archives[q]) archives[q] = {};
+      archives[q][k] = day;
+    }
+  });
+  return { openDays, archives };
+}
+
 /* ================= Remote apply ================= */
+
+function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): boolean {
+  let changed = false;
+  Object.keys(days || {}).forEach((k) => {
+    let local = state.days[k];
+    if (!local) local = state.days[k] = newDay();
+    const r = mergeDay(local, days[k]);
+    if (r.changed) { state.days[k] = r.day; changed = true; }
+  });
+  return changed;
+}
 
 function applyRemote(): void {
   const state = readLocal();
@@ -325,11 +411,9 @@ function applyRemote(): void {
   if (!state.settings) state.settings = { resetHour: 0, theme: 'dark', sound: true, name: '' };
   let changed = false;
 
-  Object.keys(remoteDays).forEach((k) => {
-    let local = state.days[k];
-    if (!local) local = state.days[k] = newDay();
-    const r = mergeDay(local, remoteDays[k]);
-    if (r.changed) { state.days[k] = r.day; changed = true; }
+  if (applyDaysToLocal(state, remoteOpenDays)) changed = true;
+  Object.keys(remoteArchives).forEach((q) => {
+    if (applyDaysToLocal(state, remoteArchives[q])) changed = true;
   });
 
   if (remoteMeta) {
@@ -360,7 +444,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
     FIELDS.forEach((f) => {
       if (f === 'order') {
         if (rt && deepEq(t[f], rt[f])) {
-          if (!ts[f]) ts[f] = (rt.ts && rt.ts[f]) || now;
+          ts[f] = Math.max(ts[f] || 0, (rt.ts && rt.ts[f]) || 0);
         } else if (localOrderTs > remoteOrderTs) {
           ts[f] = now;
         } else if (rt) {
@@ -371,7 +455,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
         return;
       }
       if (rt && deepEq(t[f], rt[f])) {
-        if (!ts[f]) ts[f] = (rt.ts && rt.ts[f]) || now;
+        ts[f] = Math.max(ts[f] || 0, (rt.ts && rt.ts[f]) || 0);
       } else {
         ts[f] = now;
       }
@@ -391,7 +475,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
   };
   (['note', 'focus', 'reflection'] as Array<'note' | 'focus' | 'reflection'>).forEach((f) => {
     if (remote && deepEq(day[f] || '', remote[f] || '')) {
-      if (!doc.fieldTs[f] && remote.fieldTs) doc.fieldTs[f] = remote.fieldTs[f] || now;
+      doc.fieldTs[f] = Math.max(doc.fieldTs[f] || 0, (remote.fieldTs && remote.fieldTs[f]) || 0);
     } else {
       doc.fieldTs[f] = now;
     }
@@ -409,7 +493,8 @@ function readLocalMeta(state: AppState, now: number, rm?: RemoteMeta | null): Re
     resetHour: 0,
     resetHourTs: 0,
     tomorrow: [],
-    tomorrowTs: 0
+    tomorrowTs: 0,
+    schema: 'v3'
   };
   const localName = (state.settings && state.settings.name) || '';
   if (rm && typeof rm.name === 'string' && rm.name === localName) {
@@ -448,26 +533,14 @@ function flush(): Promise<boolean> {
   const now = Date.now();
   const batch = db.batch();
   let ops = 0;
-  const dayKeys: string[] = [];
 
-  Object.keys(state.days || {}).forEach((k) => {
-    const day = normDay(state.days[k]);
-    batch.set(db.doc('users/' + st.hash + '/days/' + k), pushDay(day, remoteDays[k], now));
-    ops++;
-    dayKeys.push(k);
-  });
-  Object.keys(remoteDays).forEach((k) => {
-    if (!state.days || !state.days[k]) {
-      batch.delete(db.doc('users/' + st.hash + '/days/' + k));
-      ops++;
-      dayKeys.push(k + ' (delete)');
-    }
-  });
+  const openDays = buildOpen(state, now);
+  batch.set(openDoc, { days: openDays });
+  ops++;
   batch.set(metaRef, readLocalMeta(state, now), { merge: true });
   ops++;
 
-  if (!ops) return Promise.resolve(false);
-  logEvent('flush', 'pushing ' + dayKeys.join(', '));
+  logEvent('flush', 'open bundle with ' + Object.keys(openDays).length + ' days');
   return batch.commit().then(() => {
     dirty = false;
     syncError = null;
@@ -478,6 +551,34 @@ function flush(): Promise<boolean> {
     const msg = (e && e.message) ? e.message : String(e);
     syncError = msg;
     logEvent('flush-error', msg);
+    notifyStatus();
+  });
+}
+
+function sweepArchives(): Promise<boolean> {
+  if (!isPaired() || !initialized) return Promise.resolve(false);
+  const state = readLocal();
+  if (!state) return Promise.resolve(false);
+  const st = getSync();
+  if (!st) return Promise.resolve(false);
+  const now = Date.now();
+  const plan = planSweep(state, remoteArchives, now);
+  const quarters = Object.keys(plan);
+  if (!quarters.length) return Promise.resolve(false);
+  const batch = db.batch();
+  let ops = 0;
+  quarters.forEach((q) => {
+    batch.set(db.doc('users/' + st.hash + '/' + ARCHIVE_COL + '/' + q), { days: plan[q] }, { merge: true });
+    ops++;
+  });
+  logEvent('sweep', 'archiving ' + Object.keys(plan).reduce((n, q) => n + Object.keys(plan[q]).length, 0) + ' day(s) into ' + quarters.join(', '));
+  return batch.commit().then(() => {
+    touch();
+    logEvent('sweep-ok', '');
+  }).catch((e: any) => {
+    const msg = (e && e.message) ? e.message : String(e);
+    syncError = msg;
+    logEvent('sweep-error', msg);
     notifyStatus();
   });
 }
@@ -505,25 +606,37 @@ function stopListeners(): void {
 function prime(): Promise<void> {
   return metaRef.get().then((snap: any) => {
     remoteMeta = snap.exists ? snap.data() as RemoteMeta : null;
-    return daysCol.get().then((qs: any) => {
-      remoteDays = {};
-      qs.forEach((d: any) => { remoteDays[d.id] = d.data() as DayShape; });
-      initialized = true;
-      touch();
-      logEvent('prime', qs.size + ' day docs on server');
-      applyRemote();
+    return openDoc.get().then((os: any) => {
+      remoteOpenDays = os.exists && os.data() && os.data().days ? os.data().days as Record<string, DayShape> : {};
+      return archiveCol.get().then((qs: any) => {
+        remoteArchives = {};
+        qs.forEach((d: any) => { remoteArchives[d.id] = d.data().days as Record<string, DayShape>; });
+        initialized = true;
+        touch();
+        logEvent('prime', Object.keys(remoteOpenDays).length + ' open days, ' + qs.size + ' archive docs');
+        applyRemote();
+      });
     });
   });
 }
 
 function startListeners(): void {
   stopListeners();
-  unsubs.push(daysCol.onSnapshot((snap: any) => {
-    remoteDays = {};
-    snap.forEach((d: any) => { remoteDays[d.id] = d.data() as DayShape; });
+  unsubs.push(openDoc.onSnapshot((snap: any) => {
+    remoteOpenDays = snap.exists && snap.data() && snap.data().days ? snap.data().days as Record<string, DayShape> : {};
     pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
     if (!(snap.metadata && snap.metadata.fromCache)) touch();
-    logEvent('snapshot-days', snap.size + ' docs');
+    logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days');
+    applyRemote();
+  }, (err: any) => {
+    logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
+  }));
+  unsubs.push(archiveCol.onSnapshot((snap: any) => {
+    remoteArchives = {};
+    snap.forEach((d: any) => { remoteArchives[d.id] = d.data().days as Record<string, DayShape>; });
+    pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
+    if (!(snap.metadata && snap.metadata.fromCache)) touch();
+    logEvent('snapshot-archive', snap.size + ' docs');
     applyRemote();
   }, (err: any) => {
     logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
@@ -544,6 +657,54 @@ function startListeners(): void {
 
 function notifyStatus(): void {
   if (onStatusCb) onStatusCb();
+}
+
+/* ================= Migration (v2 -> v3) ================= */
+
+function migrateLegacyDays(legacy: Record<string, DayShape>): Promise<void> {
+  const st = getSync();
+  if (!st) return Promise.resolve();
+  const now = Date.now();
+  const plan = planMigration(legacy, now);
+  const legacyKeys = Object.keys(legacy);
+  const batch = db.batch();
+  batch.set(openDoc, { days: plan.openDays });
+  Object.keys(plan.archives).forEach((q) => {
+    batch.set(db.doc('users/' + st.hash + '/' + ARCHIVE_COL + '/' + q), { days: plan.archives[q] }, { merge: true });
+  });
+  legacyKeys.forEach((k) => {
+    batch.delete(db.collection('users/' + st.hash + '/days').doc(k));
+  });
+  batch.set(metaRef, { schema: 'v3' }, { merge: true });
+  remoteOpenDays = plan.openDays;
+  remoteArchives = plan.archives;
+  logEvent('migrate', legacyKeys.length + ' legacy days -> open(' + Object.keys(plan.openDays).length + ') + ' + Object.keys(plan.archives).length + ' archive docs');
+  return batch.commit().then(() => {
+    touch();
+    logEvent('migrate-ok', '');
+  }).catch((e: any) => {
+    const msg = (e && e.message) ? e.message : String(e);
+    syncError = msg;
+    logEvent('migrate-error', msg);
+    notifyStatus();
+  });
+}
+
+function primeWithMigration(): Promise<void> {
+  const st = getSync();
+  if (!st) return Promise.resolve();
+  const daysCol = db.collection('users/' + st.hash + '/days');
+  return metaRef.get().then((snap: any) => {
+    remoteMeta = snap.exists ? snap.data() as RemoteMeta : null;
+    return daysCol.get().then((qs: any) => {
+      const legacy: Record<string, DayShape> = {};
+      qs.forEach((d: any) => { legacy[d.id] = d.data() as DayShape; });
+      const legacyKeys = Object.keys(legacy);
+      const needsMigration = !!(remoteMeta && remoteMeta.schema !== 'v3') || legacyKeys.length > 0;
+      if (needsMigration) return migrateLegacyDays(legacy).then(() => prime());
+      return prime();
+    });
+  });
 }
 
 /* ================= Pairing ================= */
@@ -568,17 +729,18 @@ function pair(code: string): Promise<unknown> {
   if (!st) return Promise.reject(new Error('no-sync-state'));
   return ensureAuth().then(() => {
     metaRef = db.doc('users/' + st.hash);
-    daysCol = db.collection('users/' + st.hash + '/days');
+    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
+    archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
     return metaRef.get().then((snap: any) => {
       if (!snap.exists) {
-        return metaRef.set({ owner: st.hash, name: '', nameTs: 0, resetHour: 0, resetHourTs: 0, tomorrow: [], tomorrowTs: 0 }, { merge: true });
+        return metaRef.set({ owner: st.hash, name: '', nameTs: 0, resetHour: 0, resetHourTs: 0, tomorrow: [], tomorrowTs: 0, schema: 'v3' }, { merge: true });
       }
     });
   }).then(() => {
     if (!st) return;
     st.paired = true;
     setSyncState(st);
-    return prime().then(() => {
+    return primeWithMigration().then(() => {
       startListeners();
       flush();
       logEvent('pair-ok', 'paired');
@@ -599,7 +761,8 @@ function unpair(): void {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = null;
   initialized = false;
-  remoteDays = {};
+  remoteOpenDays = {};
+  remoteArchives = {};
   remoteMeta = null;
   dirty = false;
   syncError = null;
@@ -629,8 +792,9 @@ function init(opts?: { onRemote?: () => void }): void {
   if (st && st.paired && db) {
     ensureAuth().then(() => {
       metaRef = db.doc('users/' + st.hash);
-      daysCol = db.collection('users/' + st.hash + '/days');
-      return prime().then(() => {
+      openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
+      archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
+      return primeWithMigration().then(() => {
         startListeners();
         flush();
       });
@@ -639,7 +803,10 @@ function init(opts?: { onRemote?: () => void }): void {
   window.addEventListener('online', () => { Sync.online = true; logEvent('online', ''); retryFlush(); notifyStatus(); });
   window.addEventListener('offline', () => { Sync.online = false; logEvent('offline', ''); notifyStatus(); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) retryFlush();
+    if (!document.hidden) {
+      retryFlush();
+      sweepArchives();
+    }
   });
   setInterval(() => { retryFlush(); }, 30000);
   setInterval(heartbeat, HEARTBEAT_MS);
@@ -689,7 +856,13 @@ if (typeof module !== 'undefined' && module.exports) {
     readLocalMeta,
     cyrb53,
     hashCode,
-    genCode
+    genCode,
+    dayKey,
+    quarterKey,
+    isRecentDay,
+    buildOpen,
+    planSweep,
+    planMigration
   };
 }
 })();

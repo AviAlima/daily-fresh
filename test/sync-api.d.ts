@@ -1,3 +1,7 @@
+interface ArchiveMap {
+  [quarter: string]: Record<string, DayShape>;
+}
+
 interface SyncModule {
   mergeTask(lt: TaskShape, rt: TaskShape): { task: TaskShape; changed: boolean };
   mergeDay(local: DayShape, remote: DayShape): { day: DayShape; changed: boolean };
@@ -9,4 +13,10 @@ interface SyncModule {
   cyrb53(str: string, seed: number): string;
   hashCode(code: string): string;
   genCode(): string;
+  dayKey(d: Date): string;
+  quarterKey(day: string): string;
+  isRecentDay(day: string, now: number): boolean;
+  buildOpen(state: AppState, now: number): Record<string, DayShape>;
+  planSweep(state: AppState, remoteArchivesIn: ArchiveMap, now: number): ArchiveMap;
+  planMigration(legacyDays: Record<string, DayShape>, now: number): { openDays: Record<string, DayShape>; archives: ArchiveMap };
 }

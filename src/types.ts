@@ -60,6 +60,7 @@ interface RemoteMeta {
   resetHourTs: number;
   tomorrow: { id: string; text: string }[];
   tomorrowTs: number;
+  schema?: string;
 }
 
 interface SyncLogEntry {
