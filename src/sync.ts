@@ -729,7 +729,7 @@ function pair(code: string): Promise<unknown> {
   if (!st) return Promise.reject(new Error('no-sync-state'));
   return ensureAuth().then(() => {
     metaRef = db.doc('users/' + st.hash);
-    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
+    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC + '/' + OPEN_DOC);
     archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
     return metaRef.get().then((snap: any) => {
       if (!snap.exists) {
@@ -782,7 +782,7 @@ function runInitChain(): void {
   if (!st || !st.paired || !db) return;
   ensureAuth().then(() => {
     metaRef = db.doc('users/' + st.hash);
-    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
+    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC + '/' + OPEN_DOC);
     archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
     return primeWithMigration().then(() => {
       initAttempts = 0;
