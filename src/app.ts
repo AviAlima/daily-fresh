@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v30';
+  var APP_VERSION = 'v31';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -263,6 +263,7 @@
     task.done = !task.done;
     if (task.done) {
       task.doneAt = Date.now();
+      if (task.carriedFrom) closeOrigin(task.carriedFrom);
       if (day.focus === id) day.focus = null;
       completeChime();
       if (allDone()) setTimeout(function () { toast('All done \u2014 enjoy your day'); }, 300);
@@ -272,6 +273,17 @@
     }
     save();
     render();
+  }
+
+  function closeOrigin(cf: { day: string; id: string }) {
+    var originDay = state.days[cf.day];
+    if (!originDay) return;
+    var origin = originDay.tasks.find(function (t) { return t.id === cf.id; });
+    if (!origin) return;
+    origin.done = true;
+    origin.doneAt = Date.now();
+    if (!origin.ts) origin.ts = {};
+    origin.ts.done = Date.now();
   }
 
   function editTask(id: string, text: string) {
