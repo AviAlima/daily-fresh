@@ -18,7 +18,8 @@ service cloud.firestore {
         && resource.data.owner == hash;
       allow delete: if false;
 
-      // users/{hash}/days/{date} — per-day task documents
+      // users/{hash}/days/{date} — legacy per-day task documents (v2); v3 reads
+      // them once during migration, then deletes them
       match /days/{day} {
         allow read, list: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
@@ -27,6 +28,26 @@ service cloud.firestore {
           && request.resource.data.size() < 200000;
         allow delete: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+      }
+
+      // users/{hash}/open — v3 hot bundle: last 31 days in a single doc
+      match /open/{doc} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+        allow create, update: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash
+          && request.resource.data.size() < 900000;
+        allow delete: if false;
+      }
+
+      // users/{hash}/archive/{quarter} — v3 quarterly docs for older days
+      match /archive/{quarter} {
+        allow read, list: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
+        allow create, update: if signedIn()
+          && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash
+          && request.resource.data.size() < 900000;
+        allow delete: if false;
       }
 
       // users/{hash}/logs/{id} — best-effort diagnostic sync log mirror

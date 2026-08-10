@@ -775,6 +775,28 @@ function unpair(): void {
 
 /* ================= Init ================= */
 
+let initAttempts = 0;
+
+function runInitChain(): void {
+  const st = getSync();
+  if (!st || !st.paired || !db) return;
+  ensureAuth().then(() => {
+    metaRef = db.doc('users/' + st.hash);
+    openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
+    archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
+    return primeWithMigration().then(() => {
+      initAttempts = 0;
+      startListeners();
+      flush();
+    });
+  }).catch((e: any) => {
+    initAttempts++;
+    const msg = (e && e.message) ? e.message : String(e);
+    logEvent('init-retry', msg, { attempt: initAttempts });
+    if (initAttempts < 10) setTimeout(runInitChain, 30000);
+  });
+}
+
 function init(opts?: { onRemote?: () => void }): void {
   onRemoteCb = (opts && opts.onRemote) || null;
   try {
@@ -788,22 +810,15 @@ function init(opts?: { onRemote?: () => void }): void {
     app = null; auth = null; db = null;
   }
   logEvent(initError ? 'init-error' : 'init', initError ? initError : 'firebase ready');
-  const st = getSync();
-  if (st && st.paired && db) {
-    ensureAuth().then(() => {
-      metaRef = db.doc('users/' + st.hash);
-      openDoc = db.doc('users/' + st.hash + '/' + OPEN_DOC);
-      archiveCol = db.collection('users/' + st.hash + '/' + ARCHIVE_COL);
-      return primeWithMigration().then(() => {
-        startListeners();
-        flush();
-      });
-    }).catch(() => {});
-  }
+  if (getSync() && getSync()!.paired && db) runInitChain();
   window.addEventListener('online', () => { Sync.online = true; logEvent('online', ''); retryFlush(); notifyStatus(); });
   window.addEventListener('offline', () => { Sync.online = false; logEvent('offline', ''); notifyStatus(); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
+    if (document.hidden) return;
+    if (!initialized && getSync() && getSync()!.paired && db) {
+      initAttempts = 0;
+      runInitChain();
+    } else {
       retryFlush();
       sweepArchives();
     }
