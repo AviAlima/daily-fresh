@@ -18,14 +18,20 @@ service cloud.firestore {
         && resource.data.owner == hash;
       allow delete: if false;
 
-      // users/{hash}/days/{date} — legacy per-day task documents (v2); v3 reads
-      // them once during migration, then deletes them
+      // users/{hash}/days/{date} — legacy per-day task documents (v2). v3 reads
+      // them once during migration, then deletes them. Writes are rejected once
+      // the account is on schema v3, so stale v2 clients can no longer re-create
+      // docs and force re-migration churn.
       match /days/{day} {
         allow read, list: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
         allow create, update: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash
-          && request.resource.data.size() < 200000;
+          && request.resource.data.size() < 200000
+          && !(get(/databases/$(database)/documents/users/$(hash)).data.schema == 'v3');
+        // delete must stay allowed after migration: it runs in the same batch
+        // that stamps schema:'v3', and re-migration needs it to clean up any
+        // docs that slipped in during the migration race window
         allow delete: if signedIn()
           && get(/databases/$(database)/documents/users/$(hash)).data.owner == hash;
       }
