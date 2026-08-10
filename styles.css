@@ -1422,6 +1422,8 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
 @media (max-width: 720px) {
   .app { flex-direction: column; }
 
+  #todayView { display: flex; flex-direction: column; }
+
   .sidebar {
     width: 100%;
     height: auto;
@@ -1462,9 +1464,14 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   }
 
   .add-row.expanded {
-    left: 18px;
-    right: 18px;
-    width: auto;
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    order: 10;
+    width: 100%;
+    height: auto;
+    margin-top: 16px;
     border-radius: 14px;
     background: var(--card);
     border: 1px solid var(--border);
