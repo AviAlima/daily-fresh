@@ -846,7 +846,8 @@ root.Sync = {
     const st = getSync();
     if (!st || !st.paired || !db) return { state: 'off', lastContact, dirty, error: null };
     if (syncError) return { state: 'error', lastContact, dirty, error: syncError };
-    if (Sync.online === false || !lastContact || Date.now() - lastContact > STALE_MS) {
+    const fresh = lastContact && Date.now() - lastContact <= STALE_MS;
+    if ((Sync.online === false && !fresh) || !lastContact || Date.now() - lastContact > STALE_MS) {
       return { state: 'stale', lastContact, dirty, error: null };
     }
     if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };

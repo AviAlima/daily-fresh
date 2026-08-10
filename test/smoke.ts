@@ -51,7 +51,7 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // version
   const ver = await page.$eval('#appVersion', (el: any) => el.textContent);
   console.log('version:', ver);
-  if (ver !== 'v36') throw new Error('version mismatch: ' + ver);
+  if (ver !== 'v37') throw new Error('version mismatch: ' + ver);
 
   // history view
   await page.click('#navHistory');
