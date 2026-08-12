@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v49';
+  var APP_VERSION = 'v50';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1296,8 +1296,7 @@
     }
   });
 
-  $('resetDataBtn').addEventListener('click', function () {
-    if (!confirm('Erase all tasks, notes and history? This cannot be undone.')) return;
+  function eraseAll() {
     state = {
       settings: state.settings,
       days: {},
@@ -1309,6 +1308,43 @@
     save();
     render();
     toast('Everything erased — a fresh start');
+  }
+
+  function openEraseModal() {
+    var modal = $('eraseModal');
+    modal.classList.remove('hidden');
+    var input = $('eraseInput') as HTMLInputElement;
+    input.value = '';
+    $('eraseGo')!.classList.remove('enabled');
+    ($('eraseGo') as HTMLButtonElement).disabled = true;
+    setTimeout(function () { input.focus(); }, 150);
+  }
+
+  function closeEraseModal() {
+    $('eraseModal').classList.add('hidden');
+  }
+
+  $('resetDataBtn').addEventListener('click', openEraseModal);
+  $('eraseCancel').addEventListener('click', closeEraseModal);
+  $('eraseClose').addEventListener('click', closeEraseModal);
+  $('eraseModal').addEventListener('click', function (e) {
+    if ((e.target as HTMLElement).id === 'eraseModal') closeEraseModal();
+  });
+  $('eraseInput').addEventListener('input', function () {
+    var v = (this as HTMLInputElement).value.trim().toUpperCase();
+    var ok = v === 'DELETE ALL';
+    ($('eraseGo') as HTMLButtonElement).disabled = !ok;
+    $('eraseGo')!.classList.toggle('enabled', ok);
+  });
+  $('eraseInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !($('eraseGo') as HTMLButtonElement).disabled) {
+      closeEraseModal();
+      eraseAll();
+    }
+  });
+  $('eraseGo').addEventListener('click', function () {
+    closeEraseModal();
+    eraseAll();
   });
 
   $('updateBtn').addEventListener('click', function () {

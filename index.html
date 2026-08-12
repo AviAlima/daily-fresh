@@ -359,6 +359,19 @@
   </div>
 </div>
 
+<div class="modal-backdrop hidden" id="eraseModal">
+  <div class="modal erase-modal">
+    <button class="modal-close" id="eraseClose" aria-label="Close">&times;</button>
+    <h2>Erase everything?</h2>
+    <p>All tasks, notes and history will be deleted from this device and from sync. This cannot be undone — type <strong>DELETE ALL</strong> below to confirm.</p>
+    <input type="text" id="eraseInput" placeholder="Type DELETE ALL to confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">
+    <div class="erase-actions">
+      <button class="timer-btn" id="eraseCancel">Cancel</button>
+      <button class="danger-btn" id="eraseGo" disabled>Erase everything</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="vendor/firebase-app-compat.js"></script>

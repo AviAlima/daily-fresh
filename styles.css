@@ -1021,6 +1021,11 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 
 .danger-btn:hover { background: rgba(255, 107, 107, 0.18); }
 
+.danger-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.danger-btn:disabled:hover { background: var(--red-soft); }
+.erase-actions .danger-btn.enabled { background: var(--red); color: white; border-color: var(--red); }
+.erase-actions .danger-btn.enabled:hover { background: #ff7b7b; }
+
 /* ---------- Sync ---------- */
 .sync-row { align-items: flex-start; }
 
@@ -1126,6 +1131,23 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 .modal-close:hover { background: var(--card-hover); color: var(--text); }
 
 .focus-modal { padding: 28px 26px 26px; text-align: center; }
+
+.erase-modal { padding: 28px 26px 26px; }
+.erase-modal h2 { font-size: 20px; margin-bottom: 10px; }
+.erase-modal p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin-bottom: 16px; }
+.erase-modal p strong { color: var(--red); }
+.erase-modal input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.erase-modal input:focus { border-color: var(--accent); }
+.erase-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 
 .focus-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); }
 
