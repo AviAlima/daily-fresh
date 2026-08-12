@@ -17,6 +17,8 @@ interface SyncModule {
   quarterKey(day: string): string;
   isRecentDay(day: string, now: number): boolean;
   buildOpen(state: AppState, now: number): Record<string, DayShape>;
+  buildPushBundle(state: AppState, remote: Record<string, DayShape>, now: number): Record<string, DayShape>;
+  fingerprint(days: Record<string, DayShape>): string;
   planSweep(state: AppState, remoteArchivesIn: ArchiveMap, now: number): ArchiveMap;
   planMigration(legacyDays: Record<string, DayShape>, now: number): { openDays: Record<string, DayShape>; archives: ArchiveMap };
 }

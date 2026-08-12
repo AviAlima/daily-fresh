@@ -194,6 +194,7 @@ h1 { font-size: 27px; font-weight: 800; letter-spacing: -0.02em; }
 }
 
 .sync-pill.error .sync-dot { background: #ff5d5d; }
+.sync-pill.desync .sync-dot { background: var(--orange); }
 .sync-pill.stale .sync-dot { background: var(--text-faint); }
 
 @keyframes sync-pulse {
@@ -1026,6 +1027,7 @@ select:focus { border-color: rgba(79, 140, 255, 0.5); }
 .sync-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 
 #syncStatus.offline { color: var(--orange); }
+#syncStatus.desync { color: var(--orange); }
 
 .sync-code-row { display: flex; align-items: center; gap: 8px; }
 

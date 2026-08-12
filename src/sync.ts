@@ -47,6 +47,7 @@ let syncLog: SyncLogEntry[] | null = null;
 let dirty = false;
 let syncError: string | null = null;
 let Sync: any = { online: true };
+let pushInFlight: { fg: string; at: number } | null = null;
 
 /* ================= Server contact tracking ================= */
 
@@ -355,6 +356,34 @@ function buildOpen(state: AppState, now: number): Record<string, DayShape> {
   return out;
 }
 
+function buildPushBundle(state: AppState, remote: Record<string, DayShape>, now: number): Record<string, DayShape> {
+  const out: Record<string, DayShape> = {};
+  Object.keys(state.days || {}).forEach((k) => {
+    if (!isRecentDay(k, now)) return;
+    out[k] = pushDay(normDay(state.days[k]), remote[k] || null, now);
+  });
+  Object.keys(remote || {}).forEach((k) => {
+    if (!isRecentDay(k, now)) return;
+    if (!out[k]) out[k] = remote[k];
+  });
+  return out;
+}
+
+function canon(o: any): string {
+  if (o === null || o === undefined) return 'null';
+  if (typeof o !== 'object') return JSON.stringify(o);
+  if (Array.isArray(o)) return '[' + o.map(canon).join(',') + ']';
+  const ks = Object.keys(o).sort();
+  return '{' + ks.map((k) => { return JSON.stringify(k) + ':' + canon(o[k]); }).join(',') + '}';
+}
+
+function fingerprint(days: Record<string, DayShape>): string {
+  const keys = Object.keys(days || {}).sort();
+  const parts = keys.map((k) => { return k + ':' + canon(days[k]); });
+  const s = parts.join(';');
+  return cyrb53(s, 11) + '-' + cyrb53(s, 23);
+}
+
 function planSweep(state: AppState, remoteArchivesIn: ArchiveMap, now: number): ArchiveMap {
   const plan: ArchiveMap = {};
   Object.keys(state.days || {}).forEach((k) => {
@@ -428,6 +457,10 @@ function applyRemote(): void {
     writeLocal(state);
     logEvent('apply', 'merged remote changes into local');
     if (onRemoteCb) onRemoteCb();
+    if (pushInFlight) {
+      dirty = true;
+      retryFlush();
+    }
   }
 }
 
@@ -534,11 +567,12 @@ function flush(): Promise<boolean> {
   const batch = db.batch();
   let ops = 0;
 
-  const openDays = buildOpen(state, now);
+  const openDays = buildPushBundle(state, remoteOpenDays, now);
   batch.set(openDoc, { days: openDays });
   ops++;
   batch.set(metaRef, readLocalMeta(state, now), { merge: true });
   ops++;
+  pushInFlight = { fg: fingerprint(openDays), at: now };
 
   logEvent('flush', 'open bundle with ' + Object.keys(openDays).length + ' days');
   return batch.commit().then(() => {
@@ -626,6 +660,10 @@ function startListeners(): void {
     remoteOpenDays = snap.exists && snap.data() && snap.data().days ? snap.data().days as Record<string, DayShape> : {};
     pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
     if (!(snap.metadata && snap.metadata.fromCache)) touch();
+    if (pushInFlight && !(snap.metadata && snap.metadata.fromCache) && !(snap.metadata && snap.metadata.hasPendingWrites)) {
+      if (fingerprint(remoteOpenDays) === pushInFlight.fg) pushInFlight = null;
+      else if (Date.now() - pushInFlight.at > 60000) pushInFlight = null;
+    }
     logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days');
     applyRemote();
   }, (err: any) => {
@@ -768,6 +806,7 @@ function unpair(): void {
   syncError = null;
   lastContact = 0;
   pendingSyncWrites = false;
+  pushInFlight = null;
   setSyncState(null);
   logEvent('unpair', '');
   notifyStatus();
@@ -842,13 +881,16 @@ root.Sync = {
   getLog: readSyncLog,
   isDirty: () => dirty,
   getSyncError: () => syncError,
-  getStatus: () => {
+getStatus: () => {
     const st = getSync();
     if (!st || !st.paired || !db) return { state: 'off', lastContact, dirty, error: null };
-    if (syncError) return { state: 'error', lastContact, dirty, error: syncError };
+    if (syncError) return { state: 'error', lastContact, dirty, error: null };
     const fresh = lastContact && Date.now() - lastContact <= STALE_MS;
     if ((Sync.online === false && !fresh) || !lastContact || Date.now() - lastContact > STALE_MS) {
       return { state: 'stale', lastContact, dirty, error: null };
+    }
+    if (pushInFlight && Date.now() - pushInFlight.at <= 60000) {
+      return { state: 'desync', lastContact, dirty, error: null };
     }
     if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
     return { state: 'synced', lastContact, dirty, error: null };
@@ -877,6 +919,8 @@ if (typeof module !== 'undefined' && module.exports) {
     quarterKey,
     isRecentDay,
     buildOpen,
+    buildPushBundle,
+    fingerprint,
     planSweep,
     planMigration
   };

@@ -340,4 +340,38 @@ check('meta always carries schema v3', () => {
   assert.equal(m.schema, 'v3');
 });
 
+console.log('buildPushBundle');
+check('merges local over remote, keeps remote-only days, stamps only diffs', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const localDay = day({ tasks: [T('a', 'same', { text: 5000 })], fieldTs: { note: 3000 } });
+  const remoteDay = { ...day({ tasks: [T('a', 'same', { text: 5000 })], fieldTs: { note: 1000 } }), note: 'x' };
+  const remoteOnly = day({ tasks: [T('r', 'remote only', { done: 1000 })], fieldTs: {} });
+  const bundle = S.buildPushBundle(
+    st({ days: { '2026-08-08': localDay } }),
+    { '2026-08-08': remoteDay, '2026-08-07': remoteOnly },
+    now);
+  assert.deepEqual(Object.keys(bundle).sort(), ['2026-08-07', '2026-08-08']);
+  assert.equal(bundle['2026-08-08'].tasks[0].ts!.text, 5000);
+  assert.equal(bundle['2026-08-07'].tasks[0].id, 'r');
+});
+check('buildPushBundle excludes days outside recent window', () => {
+  const now = new Date(2026, 7, 10).getTime();
+  const bundle = S.buildPushBundle(st({ days: { '2026-01-01': day({}) } }), { '2026-01-02': day({}) }, now);
+  assert.deepEqual(bundle, {});
+});
+
+console.log('fingerprint');
+check('canonical: same content different key order = same fingerprint', () => {
+  const d1 = day({ tasks: [T('a', 'x', { done: 1, text: 2 })], fieldTs: { note: 5 } });
+  const d2 = day({ tasks: [T('a', 'x', { done: 1, text: 2 })], fieldTs: { note: 5 } });
+  const a = S.fingerprint({ '2026-08-08': d1 });
+  const b = S.fingerprint({ '2026-08-08': d2 });
+  assert.equal(a, b);
+});
+check('different content = different fingerprint', () => {
+  const d1 = day({ tasks: [T('a', 'x', { done: 1 })], fieldTs: {} });
+  const d2 = day({ tasks: [T('a', 'y', { done: 1 })], fieldTs: {} });
+  assert.notEqual(S.fingerprint({ '2026-08-08': d1 }), S.fingerprint({ '2026-08-08': d2 }));
+});
+
 console.log(pass + ' checks passed');

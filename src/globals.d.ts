@@ -26,7 +26,7 @@ interface SyncApi {
   isDirty(): boolean;
   getSyncError(): string | null;
   getStatus(): {
-    state: 'off' | 'synced' | 'pending' | 'error' | 'stale';
+    state: 'off' | 'synced' | 'pending' | 'error' | 'stale' | 'desync';
     lastContact: number;
     dirty: boolean;
     error: string | null;

@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v37';
+  var APP_VERSION = 'v38';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -607,6 +607,8 @@
     var text = '';
     if (st.state === 'synced') {
       text = 'Synced';
+    } else if (st.state === 'desync') {
+      text = 'Out of sync';
     } else if (st.state === 'pending') {
       text = 'Syncing\u2026';
     } else if (st.state === 'error') {
@@ -614,7 +616,7 @@
     } else {
       text = 'Offline';
     }
-    pill.classList.remove('synced', 'pending', 'error', 'stale');
+    pill.classList.remove('synced', 'pending', 'error', 'stale', 'desync');
     pill.classList.add(st.state);
     if (els.syncPillLabel.textContent !== text) els.syncPillLabel.textContent = text;
   }
@@ -640,11 +642,14 @@
       return;
     }
     var st = window.Sync.getStatus ? window.Sync.getStatus() : null;
-    els.syncStatus.classList.remove('offline');
+    els.syncStatus.classList.remove('offline', 'desync');
     if (st) {
       if (st.state === 'error') {
         els.syncStatus.textContent = 'Sync failed \u2014 will retry';
         els.syncStatus.classList.add('offline');
+      } else if (st.state === 'desync') {
+        els.syncStatus.textContent = 'Out of sync \u2014 waiting for the server to confirm your changes';
+        els.syncStatus.classList.add('desync');
       } else if (st.state === 'stale') {
         els.syncStatus.textContent = st.dirty
           ? 'Offline \u2014 changes saved locally, will sync'
@@ -1201,7 +1206,7 @@
   els.syncStart.addEventListener('click', function () {
     els.syncStart.disabled = true;
     els.syncStatus.textContent = 'Pairing\u2026';
-    els.syncStatus.classList.remove('offline');
+    els.syncStatus.classList.remove('offline', 'desync');
     window.Sync.start().then(function () {
       render();
       toast('Sync started \u2014 scan or enter the code on your other device');
@@ -1219,7 +1224,7 @@
     if (!v.trim()) return;
     els.syncPairBtn.disabled = true;
     els.syncStatus.textContent = 'Pairing\u2026';
-    els.syncStatus.classList.remove('offline');
+    els.syncStatus.classList.remove('offline', 'desync');
     window.Sync.pair(v).then(function () {
       els.syncInput.value = '';
       render();
@@ -1709,33 +1714,7 @@
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
   }
 
-  /* ================= Idle auto-scroll (mobile) ================= */
-
-  var idleTimer: number | null = null;
-  var idleCollapsed = false;
-
-  function resetIdleTimer() {
-    clearTimeout(idleTimer ?? undefined);
-    idleTimer = setTimeout(function () {
-      if (!isTouchScreen() || currentView !== 'today') return;
-      if (document.body.classList.contains('keyboard-open')) return;
-      idleCollapsed = true;
-      window.scrollTo({ top: 120, behavior: 'smooth' });
-    }, 5000);
-  }
-
-  document.addEventListener('touchstart', function () {
-    if (idleCollapsed) {
-      idleCollapsed = false;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    resetIdleTimer();
-  }, { passive: true });
-
-  window.addEventListener('scroll', function () {
-    if (idleCollapsed) return;
-    resetIdleTimer();
-  }, { passive: true });
+  /* ================= Keyboard focus helpers ================= */
 
   function bringFocusedIntoView(el: Element | null) {
     if (!document.body.classList.contains('keyboard-open')) return;
@@ -1857,6 +1836,5 @@
     window.Sync.onStatus(function () { renderSync(); renderSyncStatus(); });
     window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });
   }
-  resetIdleTimer();
   tick();
 })();
