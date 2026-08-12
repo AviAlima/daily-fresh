@@ -48,6 +48,7 @@ let dirty = false;
 let syncError: string | null = null;
 let Sync: any = { online: true };
 let pushInFlight: { fg: string; at: number; days: Record<string, DayShape> } | null = null;
+let confirmTimer: number | null = null;
 let lastFlushTs = 0;
 
 /* ================= Server contact tracking ================= */
@@ -593,6 +594,7 @@ function readLocalMeta(state: AppState, now: number, rm?: RemoteMeta | null): Re
 
 function flush(): Promise<boolean> {
   if (!isPaired() || !initialized) return Promise.resolve(false);
+  if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
   const state = readLocal();
   if (!state) return Promise.resolve(false);
   const st = getSync();
@@ -616,6 +618,8 @@ function flush(): Promise<boolean> {
     dirty = false;
     syncError = null;
     touch();
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(confirmPush, 1500);
     logEvent('flush-ok', '');
     notifyStatus();
   }).catch((e: any) => {
@@ -667,6 +671,24 @@ function retryFlush(): void {
   pushTimer = setTimeout(flush, 300);
 }
 
+function confirmPush(): void {
+  confirmTimer = null;
+  if (!pushInFlight || !isPaired() || !initialized) return;
+  openDoc.get().then((s: any) => {
+    if (!pushInFlight) return;
+    const cur: Record<string, DayShape> = s.exists && s.data() && s.data().days ? s.data().days : {};
+    if (fingerprint(cur) === pushInFlight.fg) {
+      pushInFlight = null;
+      logEvent('confirm-read', 'ok');
+      notifyStatus();
+    } else {
+      logEvent('confirm-read', 'diff');
+    }
+  }).catch((e: any) => {
+    logEvent('confirm-read', (e && e.message) ? e.message : String(e));
+  });
+}
+
 /* ================= Listeners ================= */
 
 function stopListeners(): void {
@@ -700,12 +722,15 @@ function startListeners(): void {
     if (pushInFlight && !(snap.metadata && snap.metadata.fromCache) && !(snap.metadata && snap.metadata.hasPendingWrites)) {
       if (fingerprint(remoteOpenDays) === pushInFlight.fg) {
         pushInFlight = null;
+        if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
       } else {
         logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
         if (Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) pushInFlight = null;
       }
     }
-    logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days');
+    logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days' +
+      ((snap.metadata && snap.metadata.hasPendingWrites) ? ' (local)' : '') +
+      ((snap.metadata && snap.metadata.fromCache) ? ' (cache)' : ''));
     applyRemote();
   }, (err: any) => {
     logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
