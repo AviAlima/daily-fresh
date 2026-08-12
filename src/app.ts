@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v44';
+  var APP_VERSION = 'v45';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -245,6 +245,7 @@
     var day = today();
     var idx = day.tasks.findIndex(function (t) { return t.id === id; });
     if (idx === -1) return;
+    if (!confirm('Delete this task?')) return;
     pushUndo();
     if (day.focus === id) day.focus = null;
     if (!day.tombstones) day.tombstones = [];
