@@ -1454,7 +1454,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
     position: static;
     flex-direction: row;
     align-items: center;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
     border-right: none;
     border-bottom: 1px solid var(--border);
     gap: 8px;
@@ -1469,7 +1469,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .nav-btn { width: auto; padding: 8px 12px; font-size: 13px; border-radius: 9px; }
   .nav-btn svg { display: none; }
 
-  .main { padding: 18px 18px calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
+  .main { padding: 14px 18px calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
 
   .add-row {
     position: fixed;
