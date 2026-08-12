@@ -1,6 +1,6 @@
 declare const sw: ServiceWorkerGlobalScope;
 
-const CACHE = 'daily-fresh-v48';
+const CACHE = 'daily-fresh-v49';
 
 const ASSETS = [
   './',
@@ -36,6 +36,10 @@ sw.addEventListener('activate', (e) => {
   );
 });
 
+sw.addEventListener('message', (e: any) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') sw.skipWaiting();
+});
+
 sw.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -45,7 +49,7 @@ sw.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin) return;
 
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();

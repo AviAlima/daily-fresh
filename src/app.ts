@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v48';
+  var APP_VERSION = 'v49';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1309,6 +1309,32 @@
     save();
     render();
     toast('Everything erased — a fresh start');
+  });
+
+  $('updateBtn').addEventListener('click', function () {
+    if (!confirm('Check for updates? The app will clear its cache and reload.')) return;
+    var done = false;
+    function reloadNow() {
+      if (done) return;
+      done = true;
+      toast('Reloading\u2026');
+      setTimeout(function () { location.reload(); }, 250);
+    }
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) {
+          if (r.waiting) { try { r.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {} }
+        });
+      }).catch(function () {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }).then(reloadNow).catch(reloadNow);
+    } else {
+      reloadNow();
+    }
+    setTimeout(reloadNow, 1500);
   });
 
   /* ================= Backup ================= */
