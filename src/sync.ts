@@ -684,7 +684,11 @@ function confirmPush(): void {
       logEvent('confirm-read', 'ok');
       notifyStatus();
     } else {
+      remoteOpenDays = cur;
       logEvent('confirm-read', 'diff');
+      applyRemote();
+      if (dirty) retryFlush();
+      notifyStatus();
     }
   }).catch((e: any) => {
     logEvent('confirm-read', (e && e.message) ? e.message : String(e));
