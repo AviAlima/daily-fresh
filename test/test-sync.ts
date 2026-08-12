@@ -374,4 +374,19 @@ check('different content = different fingerprint', () => {
   assert.notEqual(S.fingerprint({ '2026-08-08': d1 }), S.fingerprint({ '2026-08-08': d2 }));
 });
 
+console.log('pushDay: orderTs tie convergence');
+check('bumps orderTs when task arrays differ on a tie', () => {
+  const now = 9000;
+  const local = day({ tasks: [T('a', 'x', {}), T('b', 'y', {})], orderTs: 1000 });
+  const remote = day({ tasks: [T('b', 'y', {}), T('a', 'x', {})], orderTs: 1000 });
+  const doc = S.pushDay(local, remote, now);
+  assert.equal(doc.orderTs, now);
+});
+check('keeps tie orderTs when arrays match', () => {
+  const local = day({ tasks: [T('a', 'x', {}), T('b', 'y', {})], orderTs: 1000 });
+  const remote = day({ tasks: [T('a', 'x', {}), T('b', 'y', {})], orderTs: 1000 });
+  const doc = S.pushDay(local, remote, 9000);
+  assert.equal(doc.orderTs, 1000);
+});
+
 console.log(pass + ' checks passed');

@@ -47,7 +47,8 @@ let syncLog: SyncLogEntry[] | null = null;
 let dirty = false;
 let syncError: string | null = null;
 let Sync: any = { online: true };
-let pushInFlight: { fg: string; at: number } | null = null;
+let pushInFlight: { fg: string; at: number; days: Record<string, DayShape> } | null = null;
+let lastFlushTs = 0;
 
 /* ================= Server contact tracking ================= */
 
@@ -201,6 +202,7 @@ function mergeTombstones(a: Tombstone[] | undefined, b: Tombstone[] | undefined)
   });
   const out: Tombstone[] = [];
   Object.keys(byId).forEach((id) => { out.push({ id, deletedAt: byId[id] }); });
+  out.sort((a, b) => { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
   return out;
 }
 
@@ -348,6 +350,32 @@ function isRecentDay(day: string, now: number): boolean {
   return day >= dayKey(begin);
 }
 
+function pushDiff(days: Record<string, DayShape>, remote: Record<string, DayShape>): string {
+  const parts: string[] = [];
+  const keys = Object.keys(days).sort();
+  keys.forEach((k) => {
+    const d = days[k];
+    const r = remote[k];
+    if (!r) { parts.push(k + ':missing-remote'); return; }
+    const lt = d.tasks || [], rt = r.tasks || [];
+    const lIds = lt.map((t) => { return t.id; });
+    const rIds = rt.map((t) => { return t.id; });
+    if (lIds.join('|') !== rIds.join('|')) parts.push(k + ':ids[' + lIds.length + 'v' + rIds.length + ']');
+    lt.forEach((t) => {
+      const rt2 = rt.filter((x) => { return x.id === t.id; })[0];
+      if (!rt2) return;
+      const lts = JSON.stringify(t.ts || {}), rts = JSON.stringify(rt2.ts || {});
+      if (lts !== rts) parts.push(k + '/' + t.id + ':ts');
+      if (t.done !== rt2.done) parts.push(k + '/' + t.id + ':done');
+      if (t.text !== rt2.text) parts.push(k + '/' + t.id + ':text');
+    });
+    if ((d.orderTs || 0) !== (r.orderTs || 0)) parts.push(k + ':orderTs ' + d.orderTs + 'v' + r.orderTs);
+    if (JSON.stringify(d.fieldTs || {}) !== JSON.stringify(r.fieldTs || {})) parts.push(k + ':fieldTs');
+    if ((d.tombstones || []).length !== (r.tombstones || []).length) parts.push(k + ':tombs ' + (d.tombstones || []).length + 'v' + (r.tombstones || []).length);
+  });
+  return parts.join(', ') || 'same';
+}
+
 function buildOpen(state: AppState, now: number): Record<string, DayShape> {
   const out: Record<string, DayShape> = {};
   Object.keys(state.days || {}).forEach((k) => {
@@ -457,7 +485,7 @@ function applyRemote(): void {
     writeLocal(state);
     logEvent('apply', 'merged remote changes into local');
     if (onRemoteCb) onRemoteCb();
-    if (pushInFlight) {
+    if (pushInFlight && Date.now() - lastFlushTs > 700) {
       dirty = true;
       retryFlush();
     }
@@ -471,6 +499,10 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
   ((remote && remote.tasks) || []).forEach((rt) => { rtsMap[rt.id] = rt; });
   const localOrderTs = day.orderTs || 0;
   const remoteOrderTs = (remote && remote.orderTs) || 0;
+  const localIds = (day.tasks || []).map((t) => { return t.id; });
+  const remoteIds = ((remote && remote.tasks) || []).map((t) => { return t.id; });
+  const ordersDiffer = localIds.length !== remoteIds.length ||
+    localIds.some((id, i) => { return id !== remoteIds[i]; });
   const tasks = (day.tasks || []).map((t) => {
     const rt = rtsMap[t.id];
     const ts: TsMap = copyObj(t.ts || {});
@@ -506,6 +538,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
     fieldTs: copyObj(day.fieldTs || {}),
     orderTs: Math.max(localOrderTs, remoteOrderTs)
   };
+  if (remote && localOrderTs === remoteOrderTs && ordersDiffer) doc.orderTs = now;
   (['note', 'focus', 'reflection'] as Array<'note' | 'focus' | 'reflection'>).forEach((f) => {
     if (remote && deepEq(day[f] || '', remote[f] || '')) {
       doc.fieldTs[f] = Math.max(doc.fieldTs[f] || 0, (remote.fieldTs && remote.fieldTs[f]) || 0);
@@ -572,7 +605,8 @@ function flush(): Promise<boolean> {
   ops++;
   batch.set(metaRef, readLocalMeta(state, now), { merge: true });
   ops++;
-  pushInFlight = { fg: fingerprint(openDays), at: now };
+  pushInFlight = { fg: fingerprint(openDays), at: now, days: openDays };
+  lastFlushTs = now;
 
   logEvent('flush', 'open bundle with ' + Object.keys(openDays).length + ' days');
   return batch.commit().then(() => {
@@ -661,8 +695,12 @@ function startListeners(): void {
     pendingSyncWrites = pendingSyncWrites || !!(snap.metadata && snap.metadata.hasPendingWrites);
     if (!(snap.metadata && snap.metadata.fromCache)) touch();
     if (pushInFlight && !(snap.metadata && snap.metadata.fromCache) && !(snap.metadata && snap.metadata.hasPendingWrites)) {
-      if (fingerprint(remoteOpenDays) === pushInFlight.fg) pushInFlight = null;
-      else if (Date.now() - pushInFlight.at > 60000) pushInFlight = null;
+      if (fingerprint(remoteOpenDays) === pushInFlight.fg) {
+        pushInFlight = null;
+      } else {
+        logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
+        if (Date.now() - pushInFlight.at > 30000) pushInFlight = null;
+      }
     }
     logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days');
     applyRemote();
@@ -889,7 +927,7 @@ getStatus: () => {
     if ((Sync.online === false && !fresh) || !lastContact || Date.now() - lastContact > STALE_MS) {
       return { state: 'stale', lastContact, dirty, error: null };
     }
-    if (pushInFlight && Date.now() - pushInFlight.at <= 60000) {
+    if (pushInFlight && Date.now() - pushInFlight.at <= 8000) {
       return { state: 'desync', lastContact, dirty, error: null };
     }
     if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
