@@ -1739,7 +1739,12 @@
       if (flipped && kbdOpen) {
         var el = document.activeElement;
         if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
-          setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 220);
+          var target = el;
+          setTimeout(function () {
+            if (document.activeElement === target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 220);
         }
       }
     });
