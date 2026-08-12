@@ -54,6 +54,7 @@ let lastFlushTs = 0;
 
 const STALE_MS = 60000;
 const HEARTBEAT_MS = 30000;
+const OUT_OF_SYNC_MS = 8000;
 let lastContact = 0;
 let pendingSyncWrites = false;
 
@@ -601,11 +602,13 @@ function flush(): Promise<boolean> {
   let ops = 0;
 
   const openDays = buildPushBundle(state, remoteOpenDays, now);
+  const fg = fingerprint(openDays);
+  const pushedDays = openDays;
   batch.set(openDoc, { days: openDays });
   ops++;
   batch.set(metaRef, readLocalMeta(state, now), { merge: true });
   ops++;
-  pushInFlight = { fg: fingerprint(openDays), at: now, days: openDays };
+  pushInFlight = { fg, at: now, days: pushedDays };
   lastFlushTs = now;
 
   logEvent('flush', 'open bundle with ' + Object.keys(openDays).length + ' days');
@@ -699,7 +702,7 @@ function startListeners(): void {
         pushInFlight = null;
       } else {
         logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
-        if (Date.now() - pushInFlight.at > 30000) pushInFlight = null;
+        if (Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) pushInFlight = null;
       }
     }
     logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days');
@@ -901,6 +904,19 @@ function init(opts?: { onRemote?: () => void }): void {
     }
   });
   setInterval(() => { retryFlush(); }, 30000);
+  setInterval((() => {
+    let lastNotify = '';
+    return () => {
+      if (pushInFlight && Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) {
+        logEvent('echo-timeout', 'no echo for ' + Math.round((Date.now() - pushInFlight.at) / 1000) + 's');
+        pushInFlight = null;
+        notifyStatus();
+      } else if (lastNotify !== Sync.getStatus().state) {
+        lastNotify = Sync.getStatus().state;
+        notifyStatus();
+      }
+    };
+  })(), 2000);
   setInterval(heartbeat, HEARTBEAT_MS);
   notifyStatus();
 }
@@ -927,10 +943,10 @@ getStatus: () => {
     if ((Sync.online === false && !fresh) || !lastContact || Date.now() - lastContact > STALE_MS) {
       return { state: 'stale', lastContact, dirty, error: null };
     }
-    if (pushInFlight && Date.now() - pushInFlight.at <= 8000) {
+    if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
+    if (pushInFlight && Date.now() - pushInFlight.at <= OUT_OF_SYNC_MS) {
       return { state: 'desync', lastContact, dirty, error: null };
     }
-    if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
     return { state: 'synced', lastContact, dirty, error: null };
   },
   init,
