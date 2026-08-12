@@ -1447,7 +1447,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .nav-btn { width: auto; padding: 8px 12px; font-size: 13px; border-radius: 9px; }
   .nav-btn svg { display: none; }
 
-  .main { padding: calc(24px + env(safe-area-inset-top, 0px)) 18px calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
+  .main { padding: 18px 18px calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
 
   .add-row {
     position: fixed;
