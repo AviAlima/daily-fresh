@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v47';
+  var APP_VERSION = 'v48';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1700,14 +1700,19 @@
 
   /* ================= Keyboard symbiosis ================= */
 
+  var kbdOpen = false;
+
   function kbdSpace() {
     var vv = window.visualViewport;
-    if (!vv) return 0;
-    var open = vv.height < window.innerHeight * 0.82;
+    if (!vv) return false;
+    var th = kbdOpen ? 0.95 : 0.80;
+    var open = vv.height < window.innerHeight * th;
     var space = open ? Math.max(0, Math.round(window.innerHeight - vv.height)) : 0;
     document.documentElement.style.setProperty('--kbd-space', space + 'px');
     document.body.classList.toggle('keyboard-open', open);
-    return open;
+    var flipped = open !== kbdOpen;
+    kbdOpen = open;
+    return flipped;
   }
 
   function dismissKeyboard() {
@@ -1729,18 +1734,14 @@
   }
 
   if (window.visualViewport) {
-    var kbdSettleTimer: number | null = null;
     window.visualViewport.addEventListener('resize', function () {
-      clearTimeout(kbdSettleTimer ?? undefined);
-      kbdSettleTimer = setTimeout(function () {
-        var open = kbdSpace();
-        if (open) {
-          var el = document.activeElement;
-          if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+      var flipped = kbdSpace();
+      if (flipped && kbdOpen) {
+        var el = document.activeElement;
+        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+          setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 220);
         }
-      }, 160);
+      }
     });
     kbdSpace();
   }
