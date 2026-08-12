@@ -56,6 +56,7 @@ let lastFlushTs = 0;
 const STALE_MS = 60000;
 const HEARTBEAT_MS = 30000;
 const OUT_OF_SYNC_MS = 8000;
+const DESYNC_SHOW_MS = 3000;
 let lastContact = 0;
 let pendingSyncWrites = false;
 
@@ -679,6 +680,7 @@ function confirmPush(): void {
     const cur: Record<string, DayShape> = s.exists && s.data() && s.data().days ? s.data().days : {};
     if (fingerprint(cur) === pushInFlight.fg) {
       pushInFlight = null;
+      pendingSyncWrites = false;
       logEvent('confirm-read', 'ok');
       notifyStatus();
     } else {
@@ -722,6 +724,7 @@ function startListeners(): void {
     if (pushInFlight && !(snap.metadata && snap.metadata.fromCache) && !(snap.metadata && snap.metadata.hasPendingWrites)) {
       if (fingerprint(remoteOpenDays) === pushInFlight.fg) {
         pushInFlight = null;
+        pendingSyncWrites = false;
         if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
       } else {
         logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
@@ -969,9 +972,10 @@ getStatus: () => {
       return { state: 'stale', lastContact, dirty, error: null };
     }
     if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
-    if (pushInFlight && Date.now() - pushInFlight.at <= OUT_OF_SYNC_MS) {
+    if (pushInFlight && Date.now() - pushInFlight.at > DESYNC_SHOW_MS) {
       return { state: 'desync', lastContact, dirty, error: null };
     }
+    if (pushInFlight) return { state: 'pending', lastContact, dirty, error: null };
     return { state: 'synced', lastContact, dirty, error: null };
   },
   init,
