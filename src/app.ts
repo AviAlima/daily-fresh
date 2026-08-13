@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v52';
+  var APP_VERSION = 'v53';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1027,24 +1027,12 @@
     els.taskInput.focus();
   }
 
-  function setAddExpanded(open: boolean) {
-    els.addRow.classList.toggle('expanded', open);
-    if (!open) dismissKeyboard();
-  }
-
   function focusTaskInput() {
-    setAddExpanded(true);
     els.taskInput.focus();
   }
 
   $('addBtn').addEventListener('click', function () {
-    if (!isTouchScreen()) { addCurrentTask(); return; }
-    if (els.addRow.classList.contains('expanded')) {
-      if (els.taskInput.value.trim()) addCurrentTask();
-      else setAddExpanded(false);
-    } else {
-      focusTaskInput();
-    }
+    addCurrentTask();
   });
 
   els.taskInput.addEventListener('keydown', function (e) {

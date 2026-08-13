@@ -1473,46 +1473,19 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
 
   .add-row {
     position: fixed;
+    left: 18px;
     right: 18px;
     bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px));
-    width: 56px;
-    height: 56px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     z-index: 60;
-    justify-content: center;
-    transition: width 0.25s ease, border-radius 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, bottom 0.25s ease;
-  }
-
-  .add-row.expanded {
-    position: static;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    order: 10;
-    width: 100%;
-    height: auto;
-    margin-top: 16px;
-    border-radius: 14px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-soft);
-    padding: 4px 8px 4px 6px;
+    padding: 4px 14px 4px 10px;
   }
 
   .add-btn {
     width: 44px;
     height: 44px;
     font-size: 26px;
-    border-radius: 50%;
-    background: transparent;
+    border-radius: 12px;
   }
-
-  .add-row:not(.expanded) #taskInput { display: none; }
-  .add-row.expanded #taskInput { display: block; }
 
   #taskInput,
   .text-input,
