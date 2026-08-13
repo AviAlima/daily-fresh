@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v63';
+  var APP_VERSION = 'v64';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1661,6 +1661,9 @@
         return;
       }
       if (touchPress) {
+        if (touchPress.armed) {
+          if (e.cancelable) e.preventDefault();
+        }
         var dx = t.clientX - touchPress.x;
         var dy = t.clientY - touchPress.y;
         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
