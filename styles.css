@@ -1469,16 +1469,7 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .nav-btn { width: auto; padding: 8px 12px; font-size: 13px; border-radius: 9px; }
   .nav-btn svg { display: none; }
 
-  .main { padding: 14px 18px calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
-
-  .add-row {
-    position: fixed;
-    left: 18px;
-    right: 18px;
-    bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px));
-    z-index: 60;
-    padding: 4px 14px 4px 10px;
-  }
+  .main { padding: 14px 18px calc(28px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
 
   .add-btn {
     width: 44px;
