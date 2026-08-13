@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v51';
+  var APP_VERSION = 'v52';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -320,11 +320,26 @@
 
   /* ================= Carry over ================= */
 
+  function rootOrigin(t: TaskShape): string {
+    var d = t.carriedFrom && t.carriedFrom.day;
+    var id = t.carriedFrom && t.carriedFrom.id;
+    var hops = 0;
+    while (d && id && hops < 12) {
+      var parent = state.days[d] && state.days[d].tasks.find(function (x) { return x.id === id; });
+      if (!parent || !parent.carriedFrom) return d + ':' + id;
+      d = parent.carriedFrom.day;
+      id = parent.carriedFrom.id;
+      hops++;
+    }
+    return d ? d + ':' + id : '';
+  }
+
   function carryCandidates(): { day: string; task: TaskShape }[] {
     var todayTasks = today().tasks;
     var carried: Record<string, boolean> = {};
     todayTasks.forEach(function (t) {
-      if (t.carriedFrom) carried[t.carriedFrom.day + ':' + t.carriedFrom.id] = true;
+      var r = rootOrigin(t);
+      if (r) carried[r] = true;
     });
     var keys = Object.keys(state.days)
       .filter(function (k) { return k < activeDay; })
@@ -333,8 +348,9 @@
     var res: { day: string; task: TaskShape }[] = [];
     keys.forEach(function (k) {
       state.days[k].tasks.forEach(function (t) {
-        if (!t.done && !carried[k + ':' + t.id]) {
-          res.push({ day: k, task: t });
+        if (!t.done) {
+          var r = rootOrigin(t);
+          if (!r || !carried[r]) res.push({ day: k, task: t });
         }
       });
     });
@@ -552,7 +568,6 @@
 
   function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
-    var carriedTag = t.carriedFrom ? '<span class="carried-tag">carried</span>' : '';
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
     if (isToday) {
@@ -569,7 +584,6 @@
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
-      carriedTag +
       actions +
       '</li>'
     );
