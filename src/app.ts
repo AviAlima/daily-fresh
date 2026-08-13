@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v61';
+  var APP_VERSION = 'v62';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1732,8 +1732,8 @@
     var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
     var zone = 40;
     var speed = 0;
-    if (clientY < zone) speed = (zone - clientY) * 0.35;
-    else if (clientY > vh - zone) speed = -(clientY - (vh - zone)) * 0.35;
+    if (clientY < zone) speed = -(zone - clientY) * 0.35;
+    else if (clientY > vh - zone) speed = (clientY - (vh - zone)) * 0.35;
     clearInterval(autoScrollTimer ?? undefined);
     autoScrollTimer = null;
     if (speed !== 0) {
