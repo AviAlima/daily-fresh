@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v62';
+  var APP_VERSION = 'v63';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1544,11 +1544,13 @@
     li.classList.add('dragging');
     li.style.touchAction = 'none';
     li.style.animation = 'none';
+    if (isTouch) document.documentElement.classList.add('no-scroll-drag');
     haptic(10);
   }
 
   function armTask(li: HTMLElement) {
     li.classList.add('armed');
+    li.style.touchAction = 'none';
     haptic(12);
   }
 
@@ -1725,7 +1727,7 @@
     if (!inserted && list.lastElementChild !== dragged) {
       list.appendChild(dragged);
     }
-    edgeScroll(clientY);
+    if (!dragIsTouch) edgeScroll(clientY);
   }
 
   function edgeScroll(clientY: number) {
@@ -1749,6 +1751,7 @@
   function endDrag(commit: boolean) {
     clearTimeout(touchTimer ?? undefined);
     stopAutoScroll();
+    document.documentElement.classList.remove('no-scroll-drag');
     if (!dragState) return;
     var dragged = dragState.el;
     dragged.classList.remove('dragging');
