@@ -233,6 +233,14 @@
         </label>
       </div>
 
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>App update</span>
+          <span class="setting-sub">Clear cache and load the latest version</span>
+        </div>
+        <button class="timer-btn" id="updateBtn">Update</button>
+      </div>
+
       <div class="setting-row hidden" id="installRow">
         <div class="setting-label">
           <span>Install app</span>
@@ -257,8 +265,9 @@
           </div>
           <div class="hidden" id="syncBody">
             <div class="sync-code-row">
+              <button class="timer-btn" id="syncReveal" data-open="0">Show code</button>
               <code id="syncCode" dir="ltr"></code>
-              <button class="icon-btn" id="syncCopy" title="Copy code">copy</button>
+              <button class="icon-btn hidden" id="syncCopy" title="Copy code">copy</button>
             </div>
             <div class="sync-qr hidden" id="syncQr"></div>
             <button class="danger-btn sync-unpair" id="syncUnpair">Stop syncing</button>
@@ -288,14 +297,6 @@
           <button class="timer-btn" id="importBtn">Import</button>
           <input type="file" id="importFile" accept=".json,application/json" hidden>
         </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>App update</span>
-          <span class="setting-sub">Clear cache and load the latest version</span>
-        </div>
-        <button class="timer-btn" id="updateBtn">Update</button>
       </div>
 
       <div class="setting-row">

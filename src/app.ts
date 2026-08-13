@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v55';
+  var APP_VERSION = 'v56';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -468,6 +468,7 @@
     syncStart: $<HTMLButtonElement>('syncStart'),
     syncBody: $('syncBody'),
     syncCode: $('syncCode'),
+    syncReveal: $('syncReveal'),
     syncCopy: $<HTMLButtonElement>('syncCopy'),
     syncQr: $('syncQr'),
     syncPairWrap: $('syncPairWrap'),
@@ -677,8 +678,11 @@
       }
     }
     var code = window.Sync.getCode();
-    if (els.syncCode.textContent !== code) {
-      els.syncCode.textContent = code;
+    var revealed = els.syncReveal.dataset.open === '1';
+    els.syncCode.textContent = revealed ? code : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    els.syncCopy.classList.toggle('hidden', !revealed);
+    els.syncQr.classList.toggle('hidden', !revealed);
+    if (revealed && els.syncCode.textContent !== code) {
       renderQr(code);
     }
   }
@@ -1243,6 +1247,13 @@
 
   els.syncInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') els.syncPairBtn.click();
+  });
+
+  els.syncReveal.addEventListener('click', function () {
+    var open = els.syncReveal.dataset.open === '1';
+    els.syncReveal.dataset.open = open ? '0' : '1';
+    els.syncReveal.textContent = open ? 'Show code' : 'Hide code';
+    renderSync();
   });
 
   els.syncCopy.addEventListener('click', function () {
