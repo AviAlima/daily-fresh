@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v60';
+  var APP_VERSION = 'v61';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -556,6 +556,28 @@
   }
 
   function soundOn() { return state.settings.sound; }
+
+  // Tactile feedback: real vibration where the API exists (Android/desktop),
+  // a short low-frequency tick on iOS Safari (no vibrate API there).
+  function haptic(ms: number) {
+    if (navigator.vibrate) { navigator.vibrate(ms); return; }
+    try {
+      var ctx = ensureAudio();
+      if (!ctx) return;
+      var t = ctx.currentTime;
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 160;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.08, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.06);
+    } catch (e) { /* ignore */ }
+  }
 
   function completeChime() {
     if (!soundOn()) return;
@@ -1522,12 +1544,12 @@
     li.classList.add('dragging');
     li.style.touchAction = 'none';
     li.style.animation = 'none';
-    if (navigator.vibrate) navigator.vibrate(10);
+    haptic(10);
   }
 
   function armTask(li: HTMLElement) {
     li.classList.add('armed');
-    if (navigator.vibrate) navigator.vibrate(12);
+    haptic(12);
   }
 
   // ----- Mouse: long-press (600ms) arms a task; sliding then drags it, releasing without
