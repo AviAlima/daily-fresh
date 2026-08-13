@@ -5,13 +5,15 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v57';
+  var APP_VERSION = 'v58';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
   var doneOpen = false;
-  var carryOpen = true;
+  var carryOpen = false;
+  var carriedOpen = false;
+  var editId: string | null = null;
   var toastTimer: number | null = null;
   var noteSaveTimer: number | null = null;
   var calView = currentMonth();
@@ -385,6 +387,37 @@
     toast(candidates.length + (candidates.length === 1 ? ' task' : ' tasks') + ' brought to today', { label: 'Undo', fn: doUndo });
   }
 
+  /* ================= Postpone ================= */
+
+  function postponeTask(id: string, targetKey: string) {
+    var day = today();
+    var idx = day.tasks.findIndex(function (t) { return t.id === id; });
+    if (idx === -1) return;
+    var task = day.tasks[idx];
+    if (task.done) return;
+    pushUndo();
+    if (day.focus === id) day.focus = null;
+    if (!day.tombstones) day.tombstones = [];
+    day.tombstones.push({ id: id, deletedAt: Date.now() });
+    day.tasks.splice(idx, 1);
+    var td = dayObj(targetKey);
+    var t: TaskShape = {
+      id: uid(),
+      text: task.text,
+      done: false,
+      estimate: task.estimate || parseEstimate(task.text),
+      carriedFrom: { day: activeDay, id: id },
+      created: new Date().toISOString(),
+      order: td.tasks.length,
+      doneAt: null,
+      ts: null
+    };
+    td.tasks.push(t);
+    save();
+    render();
+    toast('Moved to ' + dayLabel(targetKey), { label: 'Undo', fn: doUndo });
+  }
+
   /* ================= Undo ================= */
 
   var undoSnapshot: { dayKey: string; tasks: string; tombstones: string } | null = null;
@@ -441,6 +474,20 @@
     carryCount: $('carryCount'),
     carryList: $('carryList'),
     carryToggle: $('carryToggle'),
+    carriedWrap: $('carriedWrap'),
+    carriedToggle: $('carriedToggle'),
+    carriedLabel: $('carriedLabel'),
+    carriedCount: $('carriedCount'),
+    carriedList: $('carriedList'),
+    editModal: $('editModal'),
+    editText: $<HTMLInputElement>('editText'),
+    editFocusBtn: $('editFocusBtn'),
+    editPostponeBtn: $('editPostponeBtn'),
+    editPostponeRow: $('editPostponeRow'),
+    editDate: $<HTMLInputElement>('editDate'),
+    editDeleteBtn: $('editDeleteBtn'),
+    editSave: $('editSave'),
+    editClose: $('editClose'),
     noteInput: $<HTMLTextAreaElement>('noteInput'),
     streakPill: $('streakPill'),
     historyList: $('historyList'),
@@ -553,35 +600,19 @@
     return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   }
 
-  function starIcon(on: boolean) {
-    return on
-      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>'
-      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.3l6.5-.9z"/></svg>';
-  }
-
   function pencilIcon() {
     return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>';
-  }
-
-  function xIcon() {
-    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   }
 
   function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
-    if (isToday) {
-      actions =
-        '<div class="task-actions">' +
-        '<button class="icon-btn star' + (dayObj(dayKey).focus === t.id ? ' on' : '') + '" data-star="' + t.id + '" title="Set as today\u2019s focus">' + starIcon(dayObj(dayKey).focus === t.id) + '</button>' +
-        '<button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button>' +
-        '<button class="icon-btn del" data-del="' + t.id + '" title="Delete">' + xIcon() + '</button>' +
-        '</div>';
+    if (isToday && !isTouchScreen()) {
+      actions = '<div class="task-actions"><button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button></div>';
     }
     return (
       '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
-      '<span class="drag-handle" title="Drag to reorder"><i></i><i></i><i></i></span>' +
       '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
@@ -690,7 +721,8 @@
   function renderToday() {
     var day = today();
     var tasks = orderedTasks(day.tasks);
-    var open = tasks.filter(function (t) { return !t.done; });
+    var carried = tasks.filter(function (t) { return t.carriedFrom && !t.done; });
+    var open = tasks.filter(function (t) { return !t.done && !t.carriedFrom; });
     var done = tasks.filter(function (t) { return t.done; });
 
     var g = greeting();
@@ -698,6 +730,14 @@
     els.dayDate.textContent = fullDateLabel(activeDay);
 
     els.taskList.innerHTML = open.map(function (t) { return taskHtml(t, activeDay); }).join('');
+
+    els.carriedList.innerHTML = carried.map(function (t) { return taskHtml(t, activeDay); }).join('');
+    els.carriedCount.textContent = carried.length ? ' \u00b7 ' + carried.length : '';
+    var hasCarried = carried.length > 0;
+    els.carriedWrap.classList.toggle('hidden', !hasCarried);
+    if (!hasCarried) carriedOpen = false;
+    els.carriedToggle.classList.toggle('open', carriedOpen);
+    els.carriedList.classList.toggle('hidden', !carriedOpen);
 
     els.doneList.innerHTML = done.map(function (t) { return taskHtml(t, activeDay); }).join('');
     els.doneCount.textContent = done.length ? ' \u00b7 ' + done.length : '';
@@ -1048,48 +1088,92 @@
     if (!t) return;
     var check = t.closest<HTMLElement>('[data-check]');
     if (check) { toggleTask(check.dataset.check || ''); return; }
-    var del = t.closest<HTMLElement>('[data-del]');
-    if (del) { removeTask(del.dataset.del || ''); return; }
     var edit = t.closest<HTMLElement>('[data-edit]');
-    if (edit) { startEdit(edit.dataset.edit || ''); return; }
-    var star = t.closest<HTMLElement>('[data-star]');
-    if (star) { toggleFocus(star.dataset.star || ''); return; }
+    if (edit) { openEdit(edit.dataset.edit || ''); return; }
   }
 
   els.taskList.addEventListener('click', onTaskClick);
   els.doneList.addEventListener('click', onTaskClick);
-
-  function startEdit(id: string) {
-    var li = els.taskList.querySelector('[data-id="' + id + '"]') ||
-             els.doneList.querySelector('[data-id="' + id + '"]');
-    if (!li) return;
-    var textEl = li.querySelector('.task-text') as HTMLElement;
-    var old = textEl.textContent;
-    var input = document.createElement('input');
-    input.className = 'task-edit-input';
-    input.dir = 'auto';
-    input.value = old || '';
-    textEl.replaceWith(input);
-    var actions = li.querySelector('.task-actions');
-    if (actions) (actions as HTMLElement).style.display = 'none';
-    input.focus();
-    input.select();
-    bringFocusedIntoView(input);
-    var done = function (commit: boolean) {
-      if (commit && input.value.trim()) editTask(id, input.value);
-      render();
-    };
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') done(true);
-      if (e.key === 'Escape') done(false);
-    });
-    input.addEventListener('blur', function () { done(true); });
-  }
+  els.carriedList.addEventListener('click', onTaskClick);
 
   els.carryToggle.addEventListener('click', function () {
     carryOpen = !carryOpen;
     els.carryList.style.display = carryOpen ? '' : 'none';
     els.carryToggle.classList.toggle('open', carryOpen);
+  });
+
+  els.carriedToggle.addEventListener('click', function () {
+    carriedOpen = !carriedOpen;
+    els.carriedList.classList.toggle('hidden', !carriedOpen);
+    els.carriedToggle.classList.toggle('open', carriedOpen);
+  });
+
+  /* ================= Edit modal ================= */
+
+  function openEdit(id: string) {
+    var day = today();
+    var task = day.tasks.find(function (t) { return t.id === id; });
+    if (!task) return;
+    editId = id;
+    els.editText.value = task.text;
+    els.editFocusBtn.textContent = day.focus === id ? 'Clear focus' : 'Set as focus';
+    els.editPostponeRow.classList.add('hidden');
+    els.editDate.value = '';
+    els.editModal.classList.remove('hidden');
+    els.editText.focus();
+    els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
+  }
+
+  function closeEdit() {
+    if (!editId) return;
+    editId = null;
+    els.editModal.classList.add('hidden');
+  }
+
+  function postponeFromEdit(targetKey: string) {
+    if (!editId) return;
+    var id = editId;
+    closeEdit();
+    postponeTask(id, targetKey);
+  }
+
+  els.editClose.addEventListener('click', closeEdit);
+  els.editModal.addEventListener('click', function (e) {
+    if (e.target === els.editModal) closeEdit();
+  });
+  els.editSave.addEventListener('click', function () {
+    if (!editId) return;
+    var text = els.editText.value.trim();
+    if (text) { editTask(editId, text); closeEdit(); }
+  });
+  els.editText.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') els.editSave.click();
+    if (e.key === 'Escape') closeEdit();
+  });
+  els.editFocusBtn.addEventListener('click', function () {
+    if (!editId) return;
+    toggleFocus(editId);
+    var day = today();
+    els.editFocusBtn.textContent = day.focus === editId ? 'Clear focus' : 'Set as focus';
+  });
+  els.editPostponeBtn.addEventListener('click', function () {
+    els.editPostponeRow.classList.toggle('hidden');
+  });
+  els.editPostponeRow.addEventListener('click', function (e) {
+    var t = e.target as HTMLElement | null;
+    if (!t) return;
+    var btn = t.closest<HTMLElement>('[data-postpone]') as HTMLElement;
+    if (!btn) return;
+    postponeFromEdit(btn.dataset.postpone === 'week' ? shiftKey(activeDay, 7) : shiftKey(activeDay, 1));
+  });
+  els.editDate.addEventListener('change', function () {
+    if (els.editDate.value) postponeFromEdit(els.editDate.value);
+  });
+  els.editDeleteBtn.addEventListener('click', function () {
+    if (!editId) return;
+    var id = editId;
+    closeEdit();
+    removeTask(id);
   });
 
   els.carryList.addEventListener('click', function (e) {
@@ -1441,14 +1525,12 @@
 
   var dragState: { id: string | undefined; el: HTMLElement; startClientY: number | null; moved: boolean; startTop: number; dy: number } | null = null;
   var touchTimer: number | null = null;
-  var pressOrigin: { x: number; y: number } | null = null;
   var suppressClick = false;
   var autoScrollTimer: number | null = null;
   var dragIsTouch = false;
 
   function beginDrag(li: HTMLElement, isTouch: boolean) {
     clearTimeout(touchTimer ?? undefined);
-    pressOrigin = null;
     dragIsTouch = isTouch;
     suppressClick = true;
     dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false, startTop: li.getBoundingClientRect().top, dy: 0 };
@@ -1458,27 +1540,68 @@
     if (navigator.vibrate) navigator.vibrate(10);
   }
 
-  // ----- Mouse: drag via the handle (pointer events) -----
+  // ----- Mouse: long-press (600ms) arms a task; sliding then drags it, releasing without
+  // sliding opens the edit screen. Single clicks still hit the check/buttons directly. -----
 
-  els.taskList.addEventListener('pointerdown', function (e) {
-    suppressClick = false;
-    if (e.pointerType !== 'mouse') return;
-    if (e.button !== 0) return;
-    var t = e.target as HTMLElement | null;
-    if (!t) return;
-    var li = t.closest<HTMLElement>('.task');
-    if (!li || li.classList.contains('done')) return;
-    if (t.closest('.drag-handle')) beginDrag(li, false);
+  var mousePress: { li: HTMLElement; x: number; y: number; armed: boolean } | null = null;
+  var mouseTimer: number | null = null;
+
+  var dragLists = [els.taskList, els.carriedList, els.doneList];
+
+  dragLists.forEach(function (list) {
+    list.addEventListener('pointerdown', function (e) {
+      suppressClick = false;
+      if (e.pointerType !== 'mouse') return;
+      if (e.button !== 0) return;
+      var t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest('button')) return;
+      var li = t.closest<HTMLElement>('.task');
+      if (!li || li.classList.contains('done')) return;
+      clearTimeout(mouseTimer ?? undefined);
+      mousePress = { li: li, x: e.clientX, y: e.clientY, armed: false };
+      mouseTimer = setTimeout(function () {
+        if (!mousePress) return;
+        mousePress.armed = true;
+        if (navigator.vibrate) navigator.vibrate(8);
+      }, 600);
+    });
   });
 
   window.addEventListener('pointermove', function (e) {
-    if (dragState && !dragIsTouch) applyDrag(e.clientX, e.clientY);
+    if (dragState && !dragIsTouch) { applyDrag(e.clientX, e.clientY); return; }
+    if (!mousePress) return;
+    var dx = e.clientX - mousePress.x;
+    var dy = e.clientY - mousePress.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      var press = mousePress;
+      mousePress = null;
+      clearTimeout(mouseTimer ?? undefined);
+      if (press.armed) { beginDrag(press.li, false); applyDrag(e.clientX, e.clientY); }
+    }
   });
-  window.addEventListener('pointerup', function () { if (!dragIsTouch) endDrag(true); });
-  window.addEventListener('pointercancel', function () { if (!dragIsTouch) endDrag(false); });
 
-  // ----- Touch: native touch events (long-press 1.25s anywhere on a task to drag) -----
-  // Swiping (vertical move) scrolls the page; only a stationary long-press starts a drag.
+  window.addEventListener('pointerup', function () {
+    clearTimeout(mouseTimer ?? undefined);
+    if (!dragIsTouch) {
+      if (dragState) { endDrag(true); mousePress = null; return; }
+      if (mousePress && mousePress.armed) {
+        var id = mousePress.li.dataset.id;
+        mousePress = null;
+        if (id) openEdit(id);
+        return;
+      }
+    }
+    mousePress = null;
+  });
+  window.addEventListener('pointercancel', function () {
+    if (!dragIsTouch) endDrag(false);
+    mousePress = null;
+    clearTimeout(mouseTimer ?? undefined);
+  });
+
+  // ----- Touch: native touch events (long-press 600ms arms; sliding drags, releasing opens edit) -----
+  // Swiping (vertical move) scrolls the page; only a stationary long-press arms the task.
   // iOS/WKWebView claims touch gestures (scroll, text selection, callouts) and cancels
   // the pointer stream, so we drive the drag from native touch events directly.
 
@@ -1486,40 +1609,61 @@
     return window.matchMedia('(hover: none)').matches;
   }
 
-  els.taskList.addEventListener('touchstart', function (e) {
-    if (document.body.classList.contains('keyboard-open')) dismissKeyboard();
-    var t = e.target as HTMLElement | null;
-    if (!t) return;
-    var li = t.closest<HTMLElement>('.task:not(.done)') as HTMLElement;
-    if (!li) return;
-    suppressClick = false;
-    var tt = e.touches[0];
-    pressOrigin = { x: tt.clientX, y: tt.clientY };
-    clearTimeout(touchTimer ?? undefined);
-    touchTimer = setTimeout(function () { beginDrag(li, true); }, 1250);
-  }, { passive: false });
+  var touchPress: { li: HTMLElement; x: number; y: number; armed: boolean } | null = null;
 
-  els.taskList.addEventListener('touchmove', function (e) {
-    var t = e.touches[0];
-    if (!t) return;
-    if (dragState) {
-      if (e.cancelable) e.preventDefault();
-      applyDrag(t.clientX, t.clientY);
-      return;
-    }
-    if (pressOrigin && (Math.abs(t.clientX - pressOrigin.x) > 10 || Math.abs(t.clientY - pressOrigin.y) > 10)) {
+  dragLists.forEach(function (list) {
+    list.addEventListener('touchstart', function (e) {
+      if (document.body.classList.contains('keyboard-open')) dismissKeyboard();
+      var t = e.target as HTMLElement | null;
+      if (!t) return;
+      var li = t.closest<HTMLElement>('.task') as HTMLElement;
+      if (!li) return;
+      if (t.closest('button')) return;
+      suppressClick = false;
+      var tt = e.touches[0];
+      touchPress = { li: li, x: tt.clientX, y: tt.clientY, armed: false };
       clearTimeout(touchTimer ?? undefined);
-      pressOrigin = null;
-    }
-  }, { passive: false });
+      touchTimer = setTimeout(function () {
+        if (!touchPress) return;
+        touchPress.armed = true;
+        if (navigator.vibrate) navigator.vibrate(8);
+      }, 600);
+    }, { passive: false });
 
-  els.taskList.addEventListener('touchend', function () {
-    clearTimeout(touchTimer ?? undefined);
-    if (dragIsTouch) endDrag(true);
-  });
-  els.taskList.addEventListener('touchcancel', function () {
-    clearTimeout(touchTimer ?? undefined);
-    if (dragIsTouch) endDrag(false);
+    list.addEventListener('touchmove', function (e) {
+      var t = e.touches[0];
+      if (!t) return;
+      if (dragState) {
+        if (e.cancelable) e.preventDefault();
+        applyDrag(t.clientX, t.clientY);
+        return;
+      }
+      if (touchPress) {
+        var dx = t.clientX - touchPress.x;
+        var dy = t.clientY - touchPress.y;
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          var press = touchPress;
+          touchPress = null;
+          clearTimeout(touchTimer ?? undefined);
+          if (press.armed) { beginDrag(press.li, true); applyDrag(t.clientX, t.clientY); }
+        }
+      }
+    }, { passive: false });
+
+    list.addEventListener('touchend', function () {
+      clearTimeout(touchTimer ?? undefined);
+      if (dragIsTouch) { endDrag(true); touchPress = null; return; }
+      if (touchPress && touchPress.armed) {
+        var id = touchPress.li.dataset.id;
+        if (id) openEdit(id);
+      }
+      touchPress = null;
+    });
+    list.addEventListener('touchcancel', function () {
+      clearTimeout(touchTimer ?? undefined);
+      if (dragIsTouch) endDrag(false);
+      touchPress = null;
+    });
   });
   window.addEventListener('blur', function () { endDrag(false); });
 
@@ -1542,21 +1686,23 @@
 
     var rect = dragged.getBoundingClientRect();
     var midY = rect.top + rect.height / 2;
-    var targets = els.taskList.querySelectorAll('.task');
+    var list = dragged.parentElement;
+    if (!list) return;
+    var targets = list.querySelectorAll('.task');
     var inserted = false;
     for (var i = 0; i < targets.length; i++) {
       if (targets[i] === dragged) continue;
       var tr = targets[i].getBoundingClientRect();
       if (midY < tr.top + tr.height / 2) {
         if (targets[i].previousElementSibling !== dragged) {
-          els.taskList.insertBefore(dragged, targets[i]);
+          list.insertBefore(dragged, targets[i]);
         }
         inserted = true;
         break;
       }
     }
-    if (!inserted && els.taskList.lastElementChild !== dragged) {
-      els.taskList.appendChild(dragged);
+    if (!inserted && list.lastElementChild !== dragged) {
+      list.appendChild(dragged);
     }
     edgeScroll(clientY);
   }
@@ -1581,7 +1727,6 @@
 
   function endDrag(commit: boolean) {
     clearTimeout(touchTimer ?? undefined);
-    pressOrigin = null;
     stopAutoScroll();
     if (!dragState) return;
     var dragged = dragState.el;
@@ -1591,8 +1736,11 @@
     dragged.style.transform = '';
     dragged.style.zIndex = '';
     if (commit && dragState.moved) {
+      var list = dragged.parentElement;
       var order: string[] = [];
-      els.taskList.querySelectorAll<HTMLElement>('.task').forEach(function (li) { order.push(li.dataset.id || ''); });
+      if (list) {
+        list.querySelectorAll<HTMLElement>('.task').forEach(function (li) { order.push(li.dataset.id || ''); });
+      }
       var tasks = today().tasks;
       tasks.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
       tasks.forEach(function (t, i) { t.order = i; });
@@ -1605,15 +1753,17 @@
     renderToday();
   }
 
-  els.taskList.addEventListener('click', function (e) {
-    if (suppressClick) {
-      e.preventDefault();
-      e.stopPropagation();
-      suppressClick = false;
-    }
-  }, true);
+  dragLists.forEach(function (list) {
+    list.addEventListener('click', function (e) {
+      if (suppressClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        suppressClick = false;
+      }
+    }, true);
 
-  els.taskList.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    list.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  });
 
   /* ================= Focus timer ================= */
 

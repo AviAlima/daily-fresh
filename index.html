@@ -93,6 +93,15 @@
         <div class="carry-list" id="carryList"></div>
       </div>
 
+      <div class="carried-wrap hidden" id="carriedWrap">
+        <button class="carried-toggle" id="carriedToggle">
+          <span class="chevron">&#9654;</span>
+          <span id="carriedLabel">From yesterday</span>
+          <span class="carry-count" id="carriedCount"></span>
+        </button>
+        <ul class="task-list carried-list" id="carriedList"></ul>
+      </div>
+
       <div class="list-head" id="listHead">
         <span id="listTitle">Tasks</span>
         <span class="list-sub" id="listSub"></span>
@@ -139,6 +148,28 @@
 
       <p class="kbd-hint">Press <kbd>/</kbd> to add a task</p>
     </section>
+
+    <div class="modal-backdrop hidden" id="editModal">
+      <div class="modal edit-modal">
+        <button class="modal-close" id="editClose" title="Close">&#10005;</button>
+        <h2 class="modal-title">Edit task</h2>
+        <input type="text" id="editText" dir="auto" maxlength="200" placeholder="Task text">
+        <div class="edit-row">
+          <button class="timer-btn" id="editFocusBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L21.5 9.3l-4.75 4.4 1.16 6.63L12 17.13l-5.91 3.2 1.16-6.63L2.5 9.3l6.6-1.04z"/></svg>
+            Set as focus
+          </button>
+          <button class="timer-btn" id="editPostponeBtn">Postpone</button>
+          <button class="danger-btn" id="editDeleteBtn">Delete</button>
+        </div>
+        <div class="postpone-row hidden" id="editPostponeRow">
+          <button class="postpone-opt" data-postpone="tomorrow">Tomorrow</button>
+          <button class="postpone-opt" data-postpone="week">Next week</button>
+          <input type="date" id="editDate" class="postpone-date" aria-label="Pick a date">
+        </div>
+        <button class="primary-big" id="editSave">Save</button>
+      </div>
+    </div>
 
     <section class="view hidden" id="historyView">
       <h2 class="view-title">History</h2>
