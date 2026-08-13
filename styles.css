@@ -435,38 +435,6 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
 
 .carry-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---------- Carried tasks group (pulled into today) ---------- */
-.carried-wrap {
-  margin-top: 18px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.carried-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 650;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.carried-toggle .chevron { transition: transform 0.2s; font-size: 9px; }
-.carried-toggle.open .chevron { transform: rotate(90deg); }
-
-.carried-list { margin-top: 4px; padding: 0 12px 12px; }
-.carried-list .task { border-color: rgba(79, 140, 255, 0.25); }
-
 /* ---------- List head ---------- */
 .list-head {
   display: flex;
@@ -508,6 +476,13 @@ html[data-theme="light"] .carry-day { background: rgba(15, 23, 42, 0.05); }
   box-shadow: var(--shadow);
   border-color: rgba(79, 140, 255, 0.45);
   background: var(--card-hover);
+}
+
+.task.armed {
+  transform: scale(1.03);
+  background: var(--card-hover);
+  border-color: rgba(79, 140, 255, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 @keyframes slide-in {

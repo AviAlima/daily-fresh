@@ -5,14 +5,13 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v58';
+  var APP_VERSION = 'v59';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
   var doneOpen = false;
   var carryOpen = false;
-  var carriedOpen = false;
   var editId: string | null = null;
   var toastTimer: number | null = null;
   var noteSaveTimer: number | null = null;
@@ -474,11 +473,6 @@
     carryCount: $('carryCount'),
     carryList: $('carryList'),
     carryToggle: $('carryToggle'),
-    carriedWrap: $('carriedWrap'),
-    carriedToggle: $('carriedToggle'),
-    carriedLabel: $('carriedLabel'),
-    carriedCount: $('carriedCount'),
-    carriedList: $('carriedList'),
     editModal: $('editModal'),
     editText: $<HTMLInputElement>('editText'),
     editFocusBtn: $('editFocusBtn'),
@@ -721,8 +715,7 @@
   function renderToday() {
     var day = today();
     var tasks = orderedTasks(day.tasks);
-    var carried = tasks.filter(function (t) { return t.carriedFrom && !t.done; });
-    var open = tasks.filter(function (t) { return !t.done && !t.carriedFrom; });
+    var open = tasks.filter(function (t) { return !t.done; });
     var done = tasks.filter(function (t) { return t.done; });
 
     var g = greeting();
@@ -730,14 +723,6 @@
     els.dayDate.textContent = fullDateLabel(activeDay);
 
     els.taskList.innerHTML = open.map(function (t) { return taskHtml(t, activeDay); }).join('');
-
-    els.carriedList.innerHTML = carried.map(function (t) { return taskHtml(t, activeDay); }).join('');
-    els.carriedCount.textContent = carried.length ? ' \u00b7 ' + carried.length : '';
-    var hasCarried = carried.length > 0;
-    els.carriedWrap.classList.toggle('hidden', !hasCarried);
-    if (!hasCarried) carriedOpen = false;
-    els.carriedToggle.classList.toggle('open', carriedOpen);
-    els.carriedList.classList.toggle('hidden', !carriedOpen);
 
     els.doneList.innerHTML = done.map(function (t) { return taskHtml(t, activeDay); }).join('');
     els.doneCount.textContent = done.length ? ' \u00b7 ' + done.length : '';
@@ -1094,18 +1079,11 @@
 
   els.taskList.addEventListener('click', onTaskClick);
   els.doneList.addEventListener('click', onTaskClick);
-  els.carriedList.addEventListener('click', onTaskClick);
 
   els.carryToggle.addEventListener('click', function () {
     carryOpen = !carryOpen;
     els.carryList.style.display = carryOpen ? '' : 'none';
     els.carryToggle.classList.toggle('open', carryOpen);
-  });
-
-  els.carriedToggle.addEventListener('click', function () {
-    carriedOpen = !carriedOpen;
-    els.carriedList.classList.toggle('hidden', !carriedOpen);
-    els.carriedToggle.classList.toggle('open', carriedOpen);
   });
 
   /* ================= Edit modal ================= */
@@ -1128,6 +1106,7 @@
     if (!editId) return;
     editId = null;
     els.editModal.classList.add('hidden');
+    render();
   }
 
   function postponeFromEdit(targetKey: string) {
@@ -1531,6 +1510,7 @@
 
   function beginDrag(li: HTMLElement, isTouch: boolean) {
     clearTimeout(touchTimer ?? undefined);
+    li.classList.remove('armed');
     dragIsTouch = isTouch;
     suppressClick = true;
     dragState = { id: li.dataset.id, el: li, startClientY: null, moved: false, startTop: li.getBoundingClientRect().top, dy: 0 };
@@ -1540,13 +1520,25 @@
     if (navigator.vibrate) navigator.vibrate(10);
   }
 
+  function armTask(li: HTMLElement) {
+    li.classList.add('armed');
+    if (navigator.vibrate) navigator.vibrate(12);
+  }
+
   // ----- Mouse: long-press (600ms) arms a task; sliding then drags it, releasing without
   // sliding opens the edit screen. Single clicks still hit the check/buttons directly. -----
 
   var mousePress: { li: HTMLElement; x: number; y: number; armed: boolean } | null = null;
   var mouseTimer: number | null = null;
 
-  var dragLists = [els.taskList, els.carriedList, els.doneList];
+  var dragLists = [els.taskList, els.doneList];
+
+  // ----- Mouse: a short stable press (300ms) arms the task — it lifts and vibrates.
+  // Sliding then drags it; releasing without sliding opens the edit screen.
+  // Single clicks still hit the check/buttons directly. -----
+
+  var mousePress: { li: HTMLElement; x: number; y: number; armed: boolean } | null = null;
+  var mouseTimer: number | null = null;
 
   dragLists.forEach(function (list) {
     list.addEventListener('pointerdown', function (e) {
@@ -1561,10 +1553,10 @@
       clearTimeout(mouseTimer ?? undefined);
       mousePress = { li: li, x: e.clientX, y: e.clientY, armed: false };
       mouseTimer = setTimeout(function () {
-        if (!mousePress) return;
+        if (!mousePress || mousePress.li !== li) return;
         mousePress.armed = true;
-        if (navigator.vibrate) navigator.vibrate(8);
-      }, 600);
+        armTask(li);
+      }, 300);
     });
   });
 
@@ -1596,12 +1588,13 @@
   });
   window.addEventListener('pointercancel', function () {
     if (!dragIsTouch) endDrag(false);
+    if (mousePress) mousePress.li.classList.remove('armed');
     mousePress = null;
     clearTimeout(mouseTimer ?? undefined);
   });
 
-  // ----- Touch: native touch events (long-press 600ms arms; sliding drags, releasing opens edit) -----
-  // Swiping (vertical move) scrolls the page; only a stationary long-press arms the task.
+  // ----- Touch: native touch events (stable press 300ms arms; sliding drags, releasing opens edit) -----
+  // Swiping (vertical move) scrolls the page; only a stationary press arms the task.
   // iOS/WKWebView claims touch gestures (scroll, text selection, callouts) and cancels
   // the pointer stream, so we drive the drag from native touch events directly.
 
@@ -1624,10 +1617,10 @@
       touchPress = { li: li, x: tt.clientX, y: tt.clientY, armed: false };
       clearTimeout(touchTimer ?? undefined);
       touchTimer = setTimeout(function () {
-        if (!touchPress) return;
+        if (!touchPress || touchPress.li !== li) return;
         touchPress.armed = true;
-        if (navigator.vibrate) navigator.vibrate(8);
-      }, 600);
+        armTask(li);
+      }, 300);
     }, { passive: false });
 
     list.addEventListener('touchmove', function (e) {
@@ -1661,6 +1654,7 @@
     });
     list.addEventListener('touchcancel', function () {
       clearTimeout(touchTimer ?? undefined);
+      if (touchPress) touchPress.li.classList.remove('armed');
       if (dragIsTouch) endDrag(false);
       touchPress = null;
     });
