@@ -144,6 +144,12 @@ check('pushDay includes tombstones', () => {
   const doc = S.pushDay(local, remote, Date.now());
   assert.equal(doc.tombstones.length, 1);
 });
+check('pushDay never re-pushes remotely tombstoned tasks', () => {
+  const local = day({ tasks: [T('zombie', 'came back', { text: 5000 })], tombstones: [] });
+  const remote = day({ tombstones: [{ id: 'zombie', deletedAt: 2000 }] });
+  const doc = S.pushDay(local, remote, Date.now());
+  assert.equal(doc.tasks.length, 0, 'tombstoned task dropped from push');
+});
 
 console.log('orderTs: reorder sync');
 check('newer remote orderTs adopts remote order', () => {
