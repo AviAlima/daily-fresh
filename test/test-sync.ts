@@ -144,11 +144,18 @@ check('pushDay includes tombstones', () => {
   const doc = S.pushDay(local, remote, Date.now());
   assert.equal(doc.tombstones.length, 1);
 });
-check('pushDay never re-pushes remotely tombstoned tasks', () => {
-  const local = day({ tasks: [T('zombie', 'came back', { text: 5000 })], tombstones: [] });
-  const remote = day({ tombstones: [{ id: 'zombie', deletedAt: 2000 }] });
+check('pushDay: remote tombstone blocks stale copy but allows undo (newer ts)', () => {
+  const local = day({
+    tasks: [
+      T('stale', 'old offline copy', { text: 1000 }),
+      T('undone', 'restored by undo', { text: 5000 })
+    ],
+    tombstones: []
+  });
+  const remote = day({ tombstones: [{ id: 'stale', deletedAt: 2000 }, { id: 'undone', deletedAt: 2000 }] });
   const doc = S.pushDay(local, remote, Date.now());
-  assert.equal(doc.tasks.length, 0, 'tombstoned task dropped from push');
+  assert.equal(doc.tasks.length, 1, 'only the undo-resurrected task is pushed');
+  assert.equal(doc.tasks[0].id, 'undone', 'task with ts newer than the tombstone goes through');
 });
 
 console.log('orderTs: reorder sync');

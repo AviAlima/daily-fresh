@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v59';
+  var APP_VERSION = 'v60';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -436,6 +436,11 @@
     if (!state.days[snap.dayKey]) state.days[snap.dayKey] = newDayObj();
     state.days[snap.dayKey].tasks = JSON.parse(snap.tasks);
     state.days[snap.dayKey].tombstones = JSON.parse(snap.tombstones || '[]');
+    var restoredNow = Date.now();
+    state.days[snap.dayKey].tasks.forEach(function (t) {
+      if (!t.ts) t.ts = {};
+      t.ts.text = restoredNow;
+    });
     save();
     render();
     toast('Restored');

@@ -500,8 +500,8 @@ function applyRemote(): void {
 function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape {
   const rtsMap: Record<string, TaskShape> = {};
   ((remote && remote.tasks) || []).forEach((rt) => { rtsMap[rt.id] = rt; });
-  const rTombIds: Record<string, boolean> = {};
-  ((remote && remote.tombstones) || []).forEach((tb) => { if (tb && tb.id) rTombIds[tb.id] = true; });
+  const rTombMap: Record<string, number> = {};
+  ((remote && remote.tombstones) || []).forEach((tb) => { if (tb && tb.id) rTombMap[tb.id] = tb.deletedAt; });
   const localOrderTs = day.orderTs || 0;
   const remoteOrderTs = (remote && remote.orderTs) || 0;
   const localIds = (day.tasks || []).map((t) => { return t.id; });
@@ -509,7 +509,13 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
   const ordersDiffer = localIds.length !== remoteIds.length ||
     localIds.some((id, i) => { return id !== remoteIds[i]; });
   const tasks = (day.tasks || [])
-    .filter((t) => { return !rTombIds[t.id]; })
+    .filter((t) => {
+      if (!(t.id in rTombMap)) return true;
+      // A remote tombstone blocks re-push of stale copies (ts older than the
+      // deletion), but a task whose ts is newer than the tombstone — a
+      // deliberate undo — must go through, matching mergeDay's isTombstoned rule.
+      return maxTs(t.ts || {}) > rTombMap[t.id];
+    })
     .map((t) => {
     const rt = rtsMap[t.id];
     const ts: TsMap = copyObj(t.ts || {});
