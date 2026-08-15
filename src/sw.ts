@@ -1,6 +1,6 @@
 declare const sw: ServiceWorkerGlobalScope;
 
-const CACHE = 'daily-fresh-v67';
+const CACHE = 'daily-fresh-v68';
 
 const ASSETS = [
   './',
@@ -8,6 +8,7 @@ const ASSETS = [
   './styles.css',
   './dist/app.js',
   './dist/sync.js',
+  './dist/logic.js',
   './dist/firebase-config.js',
   './vendor/firebase-app-compat.js',
   './vendor/firebase-auth-compat.js',

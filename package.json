@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json",
     "build:test": "tsc -p tsconfig.test.json",
     "typecheck": "npm run build",
-    "test": "npm run build && npm run build:test && node dist-test/test/test-sync.js",
+    "test": "npm run build && npm run build:test && node dist-test/test/test-sync.js && node dist-test/test/test-logic.js",
     "smoke": "npm run build && npm run build:test && node dist-test/test/smoke.js",
     "e2e": "npm run build && npm run build:test && node dist-test/test/e2e-sync.js"
   },

@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v67';
+  var APP_VERSION = 'v68';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -30,7 +30,7 @@
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           if (raw === localStorage.getItem(OLD_KEY)) localStorage.removeItem(OLD_KEY);
-          return migrate(parsed);
+          return Logic.migrate(parsed);
         }
         quarantine(raw);
       }
@@ -53,7 +53,7 @@
         if (!raw) continue;
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object' && parsed.days) {
-          return migrate(parsed);
+          return Logic.migrate(parsed);
         }
       } catch (e) {}
     }
@@ -66,69 +66,6 @@
       days: {},
       onboarded: false
     };
-  }
-
-  function migrate(p: any): AppState {
-    var s: AppState = {
-      settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
-      days: {},
-      onboarded: true
-    };
-    if (p.settings) {
-      if (typeof p.settings.resetHour === 'number') s.settings.resetHour = p.settings.resetHour;
-      if (typeof p.settings.theme === 'string') s.settings.theme = p.settings.theme;
-      if (typeof p.settings.sound === 'boolean') s.settings.sound = p.settings.sound;
-      if (p.settings.name) s.settings.name = p.settings.name;
-    }
-    Object.keys(p.days || {}).forEach(function (k) {
-      var raw = p.days[k];
-      if (!raw || typeof raw !== 'object') return;
-      if (Array.isArray(raw)) {
-        s.days[k] = { tasks: raw, note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 };
-      } else {
-        s.days[k] = {
-          tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
-          note: raw.note || '',
-          focus: raw.focus || null,
-          reflection: raw.reflection || '',
-          tombstones: Array.isArray(raw.tombstones) ? raw.tombstones : [],
-          fieldTs: (raw.fieldTs && typeof raw.fieldTs === 'object') ? raw.fieldTs : {},
-          orderTs: typeof raw.orderTs === 'number' ? raw.orderTs : 0
-        };
-      }
-      var seen: Record<string, boolean> = {};
-      var seenText: Record<string, boolean> = {};
-      var prevTasks = s.days[k].tasks;
-      s.days[k].tasks = prevTasks.filter(function (t) {
-        if (!t || !t.id) return true;
-        var d = t.carriedFrom && t.carriedFrom.day;
-        var id = t && t.carriedFrom && t.carriedFrom.id;
-        var hops = 0;
-        while (d && id && hops < 12) {
-          var pd = p.days[d];
-          var parent = pd && (Array.isArray(pd) ? pd : pd.tasks || []).find(function (x: any) { return x && x.id === id; });
-          if (!parent || !parent.carriedFrom) { d = d + ':' + id; id = null; break; }
-          d = parent.carriedFrom.day;
-          id = parent.carriedFrom.id;
-          hops++;
-        }
-        var root = d ? (id ? d + ':' + id : d) : (k + ':' + (t && t.id));
-        if (seen[root]) return false;
-        seen[root] = true;
-        if (!t.done && t.text) {
-          var textKey = t.text.trim().toLowerCase();
-          if (textKey) {
-            if (seenText[textKey]) return false;
-            seenText[textKey] = true;
-          }
-        }
-        return true;
-      });
-    });
-    if (typeof p.tomorrowTs === 'number') s.tomorrowTs = p.tomorrowTs;
-    if (typeof p.nameTs === 'number') s.nameTs = p.nameTs;
-    if (typeof p.resetHourTs === 'number') s.resetHourTs = p.resetHourTs;
-    return s;
   }
 
   function rotateBackups(json: string) {
@@ -159,47 +96,26 @@
 
   /* ================= Day logic ================= */
 
-  function newDayObj(): DayShape {
-    return { tasks: [], note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 };
-  }
-
-  function pad(n: number) { return n < 10 ? '0' + n : '' + n; }
+  var newDayObj = Logic.newDay;
 
   function currentDayKey() {
-    var now = new Date();
-    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (now.getHours() < state.settings.resetHour) {
-      d.setDate(d.getDate() - 1);
-    }
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    return Logic.currentDayKey(new Date(), state.settings.resetHour);
   }
 
   function shiftKey(key: string, days: number) {
-    var parts = key.split('-');
-    var d = new Date(+parts[0], +parts[1] - 1, +parts[2] + days);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    return Logic.shiftKey(key, days);
   }
 
   function dayLabel(key: string) {
-    var parts = key.split('-');
-    var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-    var today = new Date();
-    var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    var diff = Math.round((+todayStart - +d) / 86400000);
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Yesterday';
-    if (diff > 1 && diff < 7) return diff + ' days ago';
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return Logic.dayLabel(key);
   }
 
   function fullDateLabel(key: string) {
-    var parts = key.split('-');
-    var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    return Logic.fullDateLabel(key);
   }
 
   function isFirstDay() {
-    return Object.keys(state.days).length <= 1;
+    return Logic.isFirstDay(state.days);
   }
 
   function ensureDay(silent?: boolean) {
@@ -224,24 +140,11 @@
 
   /* ================= Tasks ================= */
 
-  function uid() {
-    return Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-  }
+  function uid() { return Logic.uid(); }
 
-  function parseEstimate(text: string) {
-    var m = text.match(/(\d+(?:\.\d+)?)\s*h\s*(?:(\d+)\s*m)?\s*$/i);
-    if (m) return Math.round(parseFloat(m[1]) * 60 + parseInt(m[2] || '0', 10));
-    m = text.match(/(\d+)\s*m\s*$/i);
-    if (m) return parseInt(m[1], 10);
-    return 0;
-  }
+  function parseEstimate(text: string) { return Logic.parseEstimate(text); }
 
-  function fmtEstimate(min: number) {
-    if (min < 60) return '~' + min + 'm';
-    var h = Math.floor(min / 60);
-    var rest = min % 60;
-    return '~' + h + 'h' + (rest ? ' ' + rest + 'm' : '');
-  }
+  function fmtEstimate(min: number) { return Logic.fmtEstimate(min); }
 
   function makeTask(text: string): TaskShape {
     return {
@@ -334,57 +237,21 @@
   }
 
   function allDone() {
-    var tasks = today().tasks;
-    return tasks.length > 0 && tasks.every(function (t) { return t.done; });
+    return Logic.allDone(today().tasks);
   }
 
   function orderedTasks(arr: TaskShape[]) {
-    var idx: Record<string, number> = {};
-    arr.forEach(function (t, i) { idx[t.id] = i; });
-    return arr.slice().sort(function (a, b) {
-      var oa = typeof a.order === 'number' ? a.order : idx[a.id];
-      var ob = typeof b.order === 'number' ? b.order : idx[b.id];
-      return oa - ob;
-    });
+    return Logic.orderedTasks(arr);
   }
 
   /* ================= Carry over ================= */
 
   function rootOrigin(t: TaskShape, dayKey: string): string {
-    var d = t.carriedFrom && t.carriedFrom.day;
-    var id = t.carriedFrom && t.carriedFrom.id;
-    var hops = 0;
-    while (d && id && hops < 12) {
-      var parent = state.days[d] && state.days[d].tasks.find(function (x) { return x.id === id; });
-      if (!parent || !parent.carriedFrom) return d + ':' + id;
-      d = parent.carriedFrom.day;
-      id = parent.carriedFrom.id;
-      hops++;
-    }
-    return (d && id) ? d + ':' + id : dayKey + ':' + t.id;
+    return Logic.rootOf(t, state.days, dayKey);
   }
 
   function carryCandidates(): { day: string; task: TaskShape }[] {
-    var todayTasks = today().tasks;
-    var carried: Record<string, boolean> = {};
-    todayTasks.forEach(function (t) {
-      var r = rootOrigin(t, activeDay);
-      if (r) carried[r] = true;
-    });
-    var keys = Object.keys(state.days)
-      .filter(function (k) { return k < activeDay; })
-      .sort()
-      .reverse();
-    var res: { day: string; task: TaskShape }[] = [];
-    keys.forEach(function (k) {
-      state.days[k].tasks.forEach(function (t) {
-        if (!t.done) {
-          var r = rootOrigin(t, k);
-          if (!r || !carried[r]) res.push({ day: k, task: t });
-        }
-      });
-    });
-    return res;
+    return Logic.carryCandidates(state.days, activeDay);
   }
 
   function carryTask(dayKey: string, task: TaskShape, silent?: boolean) {
@@ -821,13 +688,7 @@
   }
 
   function greeting() {
-    var h = new Date().getHours();
-    var name = state.settings.name;
-    var suffix = name ? ', ' + name : '';
-    if (h < 5) return 'Working late' + suffix + '?';
-    if (h < 12) return 'Good morning' + suffix;
-    if (h < 18) return 'Good afternoon' + suffix;
-    return 'Good evening' + suffix;
+    return Logic.greeting(new Date(), state.settings.name);
   }
 
   function renderFocus() {
@@ -872,33 +733,15 @@
   /* ================= Stats ================= */
 
   function lastKeys(n: number) {
-    var keys = [];
-    for (var i = 0; i < n; i++) keys.push(shiftKey(activeDay, -i));
-    return keys.reverse();
+    return Logic.lastKeys(activeDay, n);
   }
 
   function dayStats(key: string) {
-    var d = state.days[key];
-    if (!d || !d.tasks.length) return { total: 0, done: 0, ratio: 0, exists: false };
-    var done = d.tasks.filter(function (t) { return t.done; }).length;
-    return { total: d.tasks.length, done: done, ratio: done / d.tasks.length, exists: true };
+    return Logic.dayStats(state.days, key);
   }
 
   function streak() {
-    var s = 0;
-    var key = activeDay;
-    var st = dayStats(key);
-    if (!st.exists) key = shiftKey(key, -1);
-    while (true) {
-      var ds = dayStats(key);
-      if (ds.exists && ds.total === ds.done) {
-        s++;
-        key = shiftKey(key, -1);
-      } else {
-        break;
-      }
-    }
-    return s;
+    return Logic.streak(state.days, activeDay);
   }
 
   function renderHistory() {
@@ -991,12 +834,11 @@
   /* ================= Calendar ================= */
 
   function currentMonth() {
-    var d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
+    return Logic.currentMonth();
   }
 
   function calKey(y: number, m: number, d: number) {
-    return y + '-' + pad(m + 1) + '-' + pad(d);
+    return Logic.calKey(y, m, d);
   }
 
   function renderCalendar() {
@@ -1545,7 +1387,7 @@
         var data = JSON.parse(typeof result === 'string' ? result : '');
         if (data && data.state && typeof data.state.days === 'object') data = data.state;
         if (!data || typeof data.days !== 'object') throw new Error('invalid');
-        state = migrate(data);
+        state = Logic.migrate(data);
         state.onboarded = true;
         activeDay = currentDayKey();
         state.activeDay = activeDay;
@@ -1837,18 +1679,14 @@
     endAt: null
   };
 
-  var TIMER_C = 389.56;
-
   function fmtTime(s: number) {
-    var m = Math.floor(s / 60);
-    var sec = Math.floor(s % 60);
-    return pad(m) + ':' + pad(sec);
+    return Logic.fmtTime(s);
   }
 
   function updateTimerUI() {
     $('timerTime').textContent = fmtTime(timer.remaining);
     var fg = document.querySelector('.timer-fg') as HTMLElement;
-    fg.style.strokeDashoffset = String(TIMER_C * (1 - (timer.remaining / timer.total)));
+    fg.style.strokeDashoffset = String(Logic.timerStroke(timer.remaining, timer.total));
     var modal = $('focusModal');
     var timerEl = modal.querySelector('.timer') as HTMLElement;
     timerEl.classList.toggle('running', timer.running);

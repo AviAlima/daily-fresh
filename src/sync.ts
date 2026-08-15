@@ -497,40 +497,7 @@ function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): { ch
 }
 
 function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean } {
-  const seenRoot: Record<string, boolean> = {};
-  const seenText: Record<string, boolean> = {};
-  let dropped = false;
-  const out: TaskShape[] = [];
-  tasks.forEach((t) => {
-    if (!t || !t.id) { out.push(t); return; }
-    const root = rootOf(t, days);
-    if (root) {
-      if (seenRoot[root]) { dropped = true; return; }
-      seenRoot[root] = true;
-    }
-    if (!t.done && t.text) {
-      const normText = t.text.trim().toLowerCase();
-      if (normText) {
-        if (seenText[normText]) { dropped = true; return; }
-        seenText[normText] = true;
-      }
-    }
-    out.push(t);
-  });
-  return { tasks: out, dropped };
-}
-
-function rootOf(t: TaskShape, days: Record<string, DayShape>): string {
-  let d = t.carriedFrom && t.carriedFrom.day;
-  let id = t.carriedFrom && t.carriedFrom.id;
-  for (let hops = 0; hops < 12 && d && id; hops++) {
-    const pd = days[d];
-    const parent = pd && (pd.tasks || []).find((x) => { return x && x.id === id; });
-    if (!parent || !parent.carriedFrom) return d + ':' + id;
-    d = parent.carriedFrom.day;
-    id = parent.carriedFrom.id;
-  }
-  return (d && id) ? d + ':' + id : '';
+  return Logic.dedupeDay(tasks, days, '');
 }
 
 function applyRemote(): void {

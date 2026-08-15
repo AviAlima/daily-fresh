@@ -15,6 +15,8 @@ declare var FIREBASE_CONFIG: {
   appId: string;
 };
 
+declare const Logic: LogicApi;
+
 interface SyncApi {
   state: unknown;
   online: boolean;
@@ -44,8 +46,36 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: string }>;
 }
 
+interface LogicApi {
+  pad(n: number): string;
+  currentMonth(now?: Date): { y: number; m: number };
+  calKey(y: number, m: number, d: number): string;
+  shiftKey(key: string, days: number): string;
+  currentDayKey(now: Date, resetHour: number): string;
+  dayLabel(key: string, now?: Date): string;
+  fullDateLabel(key: string): string;
+  newDay(): DayShape;
+  uid(): string;
+  parseEstimate(text: string): number;
+  fmtEstimate(min: number): string;
+  fmtTime(s: number): string;
+  timerStroke(remaining: number, total: number): number;
+  orderedTasks(arr: TaskShape[]): TaskShape[];
+  allDone(tasks: TaskShape[]): boolean;
+  isFirstDay(days: Record<string, DayShape>): boolean;
+  dayStats(days: Record<string, DayShape>, key: string): { total: number; done: number; ratio: number; exists: boolean };
+  lastKeys(activeDay: string, n: number): string[];
+  streak(days: Record<string, DayShape>, activeDay: string): number;
+  greeting(now: Date, name: string): string;
+  rootOf(t: TaskShape, days: Record<string, DayShape>, dayKey: string): string;
+  dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean };
+  carryCandidates(days: Record<string, DayShape>, activeDay: string): { day: string; task: TaskShape }[];
+  migrate(p: unknown): AppState;
+}
+
 interface Window {
   Sync: SyncApi;
+  Logic: LogicApi;
   webkitAudioContext?: typeof AudioContext;
 }
 
