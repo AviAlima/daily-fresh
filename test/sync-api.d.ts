@@ -20,6 +20,18 @@ interface SyncModule {
   buildOpen(state: AppState, now: number): Record<string, DayShape>;
   buildPushBundle(state: AppState, remote: Record<string, DayShape>, now: number): Record<string, DayShape>;
   fingerprint(days: Record<string, DayShape>): string;
+  statusState(input: {
+    st: { code: string; hash: string; paired: boolean } | null;
+    ready: boolean;
+    error: string | null;
+    online: boolean;
+    lastContact: number;
+    dirty: boolean;
+    pending: boolean;
+    pushAt: number;
+    desync: boolean;
+    now: number;
+  }): 'off' | 'synced' | 'pending' | 'error' | 'stale' | 'desync';
   planSweep(state: AppState, remoteArchivesIn: ArchiveMap, now: number): ArchiveMap;
   planMigration(legacyDays: Record<string, DayShape>, now: number): { openDays: Record<string, DayShape>; archives: ArchiveMap };
 }

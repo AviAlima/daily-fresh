@@ -53,6 +53,52 @@ check('12 chars from safe alphabet', () => {
   assert.ok(/^[A-Z2-9]+$/.test(c));
 });
 
+console.log('sync status');
+const statusBase = {
+  st: { code: 'ABC234', hash: 'owner', paired: true },
+  ready: true,
+  error: null,
+  online: true,
+  lastContact: 100000,
+  dirty: false,
+  pending: false,
+  pushAt: 0,
+  desync: false,
+  now: 100000,
+};
+check('off when unpaired or not ready', () => {
+  assert.equal(S.statusState({ ...statusBase, st: { code: 'ABC234', hash: 'o', paired: false } }), 'off');
+  assert.equal(S.statusState({ ...statusBase, st: null }), 'off');
+  assert.equal(S.statusState({ ...statusBase, ready: false }), 'off');
+});
+check('error wins over every live state', () => {
+  assert.equal(S.statusState({ ...statusBase, error: 'boom', desync: true }), 'error');
+  assert.equal(S.statusState({ ...statusBase, error: 'boom', dirty: true, pushAt: 500 }), 'error');
+});
+check('stale when no recent server contact', () => {
+  assert.equal(S.statusState({ ...statusBase, lastContact: 10000, now: 100000 }), 'stale');
+  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 100000, now: 100000 }), 'stale');
+});
+check('stale beats pending push without contact', () => {
+  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 0, dirty: true, pushAt: 90000 }), 'stale');
+});
+check('desync flag wins over pending work', () => {
+  assert.equal(S.statusState({ ...statusBase, desync: true, dirty: true, pushAt: 90000 }), 'desync');
+});
+check('long-unconfirmed push reports desync', () => {
+  assert.equal(S.statusState({ ...statusBase, pushAt: 96000 }), 'desync');
+});
+check('active push remains pending before server confirmation', () => {
+  assert.equal(S.statusState({ ...statusBase, pushAt: 99900 }), 'pending');
+});
+check('dirty or pending write shows pending', () => {
+  assert.equal(S.statusState({ ...statusBase, dirty: true }), 'pending');
+  assert.equal(S.statusState({ ...statusBase, pending: true }), 'pending');
+});
+check('fresh contact + no work = synced', () => {
+  assert.equal(S.statusState(statusBase), 'synced');
+});
+
 console.log('mergeTask: done toggle newest wins');
 check('remote newer done=true wins', () => {
   const local = T('a', 'x'); local.done = false; local.ts.done = 1000;
@@ -111,6 +157,43 @@ check('dedupeDay leaves single-task days untouched', () => {
   const res = S.dedupeDay(days['2026-08-14'].tasks, days);
   assert.ok(!res.dropped);
   assert.equal(res.tasks.length, 1);
+});
+check('dedupeDay drops uncompleted same-text tasks even without carriedFrom', () => {
+  const days = st({ days: {
+    '2026-08-14': day({ tasks: [
+      T('t1', 'Renew license'),
+      T('t2', 'Renew license'),
+      T('t3', 'Renew license')
+    ] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.ok(res.dropped);
+  assert.equal(res.tasks.length, 1);
+  assert.equal(res.tasks[0].id, 't1');
+});
+check('dedupeDay text match is case/whitespace insensitive', () => {
+  const days = st({ days: {
+    '2026-08-14': day({ tasks: [T('t1', '  Call Mom  '), T('t2', 'call mom')] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.equal(res.tasks.length, 1);
+});
+check('dedupeDay keeps completed tasks regardless of duplicate text', () => {
+  const days = st({ days: {
+    '2026-08-14': day({ tasks: [
+      Object.assign(T('t1', 'Buy milk'), { done: true, doneAt: 100 }),
+      T('t2', 'Buy milk')
+    ] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.equal(res.tasks.length, 2);
+});
+check('dedupeDay does not dedupe distinct texts', () => {
+  const days = st({ days: {
+    '2026-08-14': day({ tasks: [T('t1', 'A'), T('t2', 'B'), T('t3', 'A done later?')] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.equal(res.tasks.length, 3);
 });
 check('local task absent remotely is kept', () => {
   const local = day({ tasks: [T('l', 'local only', { done: 1 })], fieldTs: {} });

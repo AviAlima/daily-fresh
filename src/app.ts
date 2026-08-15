@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v66';
+  var APP_VERSION = 'v67';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -13,6 +13,7 @@
   var doneOpen = false;
   var carryOpen = false;
   var editId: string | null = null;
+  var editOpenAt = 0;
   var toastTimer: number | null = null;
   var noteSaveTimer: number | null = null;
   var calView = currentMonth();
@@ -96,6 +97,7 @@
         };
       }
       var seen: Record<string, boolean> = {};
+      var seenText: Record<string, boolean> = {};
       var prevTasks = s.days[k].tasks;
       s.days[k].tasks = prevTasks.filter(function (t) {
         if (!t || !t.id) return true;
@@ -113,6 +115,13 @@
         var root = d ? (id ? d + ':' + id : d) : (k + ':' + (t && t.id));
         if (seen[root]) return false;
         seen[root] = true;
+        if (!t.done && t.text) {
+          var textKey = t.text.trim().toLowerCase();
+          if (textKey) {
+            if (seenText[textKey]) return false;
+            seenText[textKey] = true;
+          }
+        }
         return true;
       });
     });
@@ -1149,6 +1158,7 @@
     els.editPostponeRow.classList.add('hidden');
     els.editDate.value = '';
     els.editModal.classList.remove('hidden');
+    editOpenAt = Date.now();
     els.editText.focus();
     els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
   }
@@ -1169,7 +1179,7 @@
 
   els.editClose.addEventListener('click', closeEdit);
   els.editModal.addEventListener('click', function (e) {
-    if (e.target === els.editModal) closeEdit();
+    if (e.target === els.editModal && Date.now() - editOpenAt > 600) closeEdit();
   });
   els.editSave.addEventListener('click', function () {
     if (!editId) return;

@@ -15,6 +15,7 @@ async function newDevice(browser: any, label: string): Promise<Device> {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   page.on('pageerror', (e: any) => console.log('  [' + label + ' pageerror] ' + e.message));
+  page.on('dialog', (d: any) => d.accept());
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle' });
@@ -26,6 +27,7 @@ async function newDevice(browser: any, label: string): Promise<Device> {
 }
 
 async function addTask(page: any, text: string) {
+  await page.waitForSelector('#taskInput', { timeout: 5000 }).catch(() => {});
   await page.fill('#taskInput', text);
   await page.press('#taskInput', 'Enter');
   await sleep(300);
@@ -40,6 +42,20 @@ async function doneTasks(page: any): Promise<any[]> {
   return page.$$eval('#doneList .task', (els: any[]) => els.map((e: any) => e.querySelector('.task-text').textContent));
 }
 
+async function longPress(page: any, selector: string) {
+  const ctxPage = page;
+  const cdp = await (page.context() as any).newCDPSession(page);
+  const box = await page.locator(selector).boundingBox();
+  if (!box) throw new Error('longPress: ' + selector + ' not visible');
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await sleep(800);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(300);
+  const open = await ctxPage.$eval('#editModal', (el: any) => !el.classList.contains('hidden'));
+  if (!open) throw new Error('longPress: edit modal did not open');
+}
+
 (async () => {
   const browser = await chromium.launch();
 
@@ -51,7 +67,12 @@ async function doneTasks(page: any): Promise<any[]> {
   if (!startBtn) { console.log('FAIL: sync section not rendered'); process.exit(1); }
   await desk.page.click('#syncStart');
   await sleep(7000);
-  const code = await desk.page.$eval('#syncCode', (el: any) => el.textContent.trim());
+  let code = '';
+  for (let i = 0; i < 30 && !/^[A-Z2-9]{12}$/.test(code); i++) {
+    await desk.page.click('#syncReveal').catch(() => {});
+    code = await desk.page.$eval('#syncCode', (el: any) => el.textContent.trim()).catch(() => '');
+    if (!/^[A-Z2-9]{12}$/.test(code)) await sleep(500);
+  }
   console.log('sync code:', code);
   check('code generated (12 chars)', /^[A-Z2-9]{12}$/.test(code), code);
 
@@ -89,8 +110,10 @@ async function doneTasks(page: any): Promise<any[]> {
   check('concurrent adds both survive on desktop', deskTasks.includes('From desktop B') && deskTasks.includes('From phone C'), JSON.stringify(deskTasks));
 
   // ---- Delete on phone -> stays deleted on desktop (tombstone) ----
-  const delBtn = await ph.page.$('#taskList .task:has-text("From desktop B") .del');
-  await delBtn.click();
+  await ph.page.click('#navToday');
+  await sleep(300);
+  await longPress(ph.page, '#taskList .task:has-text("From desktop B")');
+  await ph.page.click('#editDeleteBtn');
   await sleep(4000);
   const deskAfterDel = await openTasks(desk.page);
   const deskDone2 = await doneTasks(desk.page);

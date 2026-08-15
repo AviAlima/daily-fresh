@@ -46,10 +46,11 @@ let initError: string | null = null;
 let syncLog: SyncLogEntry[] | null = null;
 let dirty = false;
 let syncError: string | null = null;
-let Sync: any = { online: true };
+let syncState: any = { online: true };
 let pushInFlight: { fg: string; at: number; days: Record<string, DayShape> } | null = null;
 let confirmTimer: number | null = null;
 let lastFlushTs = 0;
+let syncDesync = false;
 
 /* ================= Server contact tracking ================= */
 
@@ -59,6 +60,30 @@ const OUT_OF_SYNC_MS = 8000;
 const DESYNC_SHOW_MS = 3000;
 let lastContact = 0;
 let pendingSyncWrites = false;
+
+type SyncStatusState = 'off' | 'synced' | 'pending' | 'error' | 'stale' | 'desync';
+
+function statusState(input: {
+  st: SyncState | null;
+  ready: boolean;
+  error: string | null;
+  online: boolean;
+  lastContact: number;
+  dirty: boolean;
+  pending: boolean;
+  pushAt: number;
+  desync: boolean;
+  now: number;
+}): SyncStatusState {
+  const { st, ready, error, online, lastContact: contact, dirty, pending, pushAt, desync, now } = input;
+  if (!st || !st.paired || !ready) return 'off';
+  if (error) return 'error';
+  const fresh = contact > 0 && now - contact <= STALE_MS;
+  if ((online === false && !fresh) || !fresh) return 'stale';
+  if (desync || (pushAt > 0 && now - pushAt > DESYNC_SHOW_MS)) return 'desync';
+  if (dirty || pending || pushAt > 0) return 'pending';
+  return 'synced';
+}
 
 function touch(): void {
   lastContact = Date.now();
@@ -93,14 +118,14 @@ function hashCode(code: string): string {
 /* ================= Storage ================= */
 
 function getSync(): SyncState | null {
-  if (!Sync.state) {
-    try { Sync.state = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch (e) { Sync.state = null; }
+  if (!syncState.state) {
+    try { syncState.state = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch (e) { syncState.state = null; }
   }
-  return Sync.state as SyncState | null;
+  return syncState.state as SyncState | null;
 }
 
 function setSyncState(s: SyncState | null): void {
-  Sync.state = s;
+  syncState.state = s;
   try { localStorage.setItem(SYNC_KEY, JSON.stringify(s)); } catch (e) {}
 }
 
@@ -453,29 +478,42 @@ function planMigration(legacyDays: Record<string, DayShape>, now: number): {
 
 /* ================= Remote apply ================= */
 
-function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): boolean {
+function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): { changed: boolean; normalized: boolean } {
   let changed = false;
+  let normalized = false;
   Object.keys(days || {}).forEach((k) => {
     let local = state.days[k];
     if (!local) local = state.days[k] = newDay();
     const r = mergeDay(local, days[k]);
     if (r.changed) { state.days[k] = r.day; changed = true; }
     const dd = dedupeDay(state.days[k].tasks, state.days);
-    if (dd.dropped) { state.days[k].tasks = dd.tasks; changed = true; }
+    if (dd.dropped) {
+      state.days[k].tasks = dd.tasks;
+      changed = true;
+      normalized = true;
+    }
   });
-  return changed;
+  return { changed, normalized };
 }
 
 function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean } {
-  const seen: Record<string, boolean> = {};
+  const seenRoot: Record<string, boolean> = {};
+  const seenText: Record<string, boolean> = {};
   let dropped = false;
   const out: TaskShape[] = [];
   tasks.forEach((t) => {
     if (!t || !t.id) { out.push(t); return; }
     const root = rootOf(t, days);
     if (root) {
-      if (seen[root]) { dropped = true; return; }
-      seen[root] = true;
+      if (seenRoot[root]) { dropped = true; return; }
+      seenRoot[root] = true;
+    }
+    if (!t.done && t.text) {
+      const normText = t.text.trim().toLowerCase();
+      if (normText) {
+        if (seenText[normText]) { dropped = true; return; }
+        seenText[normText] = true;
+      }
     }
     out.push(t);
   });
@@ -501,10 +539,15 @@ function applyRemote(): void {
   if (!state.days) state.days = {};
   if (!state.settings) state.settings = { resetHour: 0, theme: 'dark', sound: true, name: '' };
   let changed = false;
+  let normalized = false;
 
-  if (applyDaysToLocal(state, remoteOpenDays)) changed = true;
+  const openResult = applyDaysToLocal(state, remoteOpenDays);
+  if (openResult.changed) changed = true;
+  if (openResult.normalized) normalized = true;
   Object.keys(remoteArchives).forEach((q) => {
-    if (applyDaysToLocal(state, remoteArchives[q])) changed = true;
+    const archiveResult = applyDaysToLocal(state, remoteArchives[q]);
+    if (archiveResult.changed) changed = true;
+    if (archiveResult.normalized) normalized = true;
   });
 
   if (remoteMeta) {
@@ -523,6 +566,10 @@ function applyRemote(): void {
       dirty = true;
       retryFlush();
     }
+  }
+  if (normalized) {
+    dirty = true;
+    retryFlush();
   }
 }
 
@@ -713,6 +760,16 @@ function retryFlush(): void {
   pushTimer = setTimeout(flush, 300);
 }
 
+function markDesync(reason: string): void {
+  syncDesync = true;
+  dirty = true;
+  pushInFlight = null;
+  if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
+  logEvent('desync', reason);
+  retryFlush();
+  notifyStatus();
+}
+
 function confirmPush(): void {
   confirmTimer = null;
   if (!pushInFlight || !isPaired() || !initialized) return;
@@ -722,14 +779,14 @@ function confirmPush(): void {
     if (fingerprint(cur) === pushInFlight.fg) {
       pushInFlight = null;
       pendingSyncWrites = false;
+      syncDesync = false;
       logEvent('confirm-read', 'ok');
       notifyStatus();
     } else {
       remoteOpenDays = cur;
       logEvent('confirm-read', 'diff');
       applyRemote();
-      if (dirty) retryFlush();
-      notifyStatus();
+      markDesync('server state differs from the pushed state');
     }
   }).catch((e: any) => {
     logEvent('confirm-read', (e && e.message) ? e.message : String(e));
@@ -770,10 +827,13 @@ function startListeners(): void {
       if (fingerprint(remoteOpenDays) === pushInFlight.fg) {
         pushInFlight = null;
         pendingSyncWrites = false;
+        syncDesync = false;
         if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
       } else {
         logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
-        if (Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) pushInFlight = null;
+        if (Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) {
+          markDesync('server echo differs from the pushed state');
+        }
       }
     }
     logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days' +
@@ -803,7 +863,7 @@ function startListeners(): void {
     logEvent('snapshot-error', (err && err.message) ? err.message : String(err));
   }));
   try {
-    db.onSnapshotsInSync(function () { Sync.online = true; pendingSyncWrites = false; touch(); });
+    db.onSnapshotsInSync(function () { syncState.online = true; notifyStatus(); });
   } catch (e) {}
 }
 
@@ -921,6 +981,7 @@ function unpair(): void {
   lastContact = 0;
   pendingSyncWrites = false;
   pushInFlight = null;
+  syncDesync = false;
   setSyncState(null);
   logEvent('unpair', '');
   notifyStatus();
@@ -964,8 +1025,8 @@ function init(opts?: { onRemote?: () => void }): void {
   }
   logEvent(initError ? 'init-error' : 'init', initError ? initError : 'firebase ready');
   if (getSync() && getSync()!.paired && db) runInitChain();
-  window.addEventListener('online', () => { Sync.online = true; logEvent('online', ''); retryFlush(); notifyStatus(); });
-  window.addEventListener('offline', () => { Sync.online = false; logEvent('offline', ''); notifyStatus(); });
+  window.addEventListener('online', () => { syncState.online = true; logEvent('online', ''); retryFlush(); notifyStatus(); });
+  window.addEventListener('offline', () => { syncState.online = false; logEvent('offline', ''); notifyStatus(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     if (!initialized && getSync() && getSync()!.paired && db) {
@@ -981,11 +1042,9 @@ function init(opts?: { onRemote?: () => void }): void {
     let lastNotify = '';
     return () => {
       if (pushInFlight && Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) {
-        logEvent('echo-timeout', 'no echo for ' + Math.round((Date.now() - pushInFlight.at) / 1000) + 's');
-        pushInFlight = null;
-        notifyStatus();
-      } else if (lastNotify !== Sync.getStatus().state) {
-        lastNotify = Sync.getStatus().state;
+        markDesync('no matching server echo after ' + Math.round((Date.now() - pushInFlight.at) / 1000) + 's');
+      } else if (lastNotify !== currentStatus().state) {
+        lastNotify = currentStatus().state;
         notifyStatus();
       }
     };
@@ -995,6 +1054,24 @@ function init(opts?: { onRemote?: () => void }): void {
 }
 
 /* ================= Public API ================= */
+
+function currentStatus(): { state: SyncStatusState; lastContact: number; dirty: boolean; error: string | null } {
+  const st = getSync();
+  const now = Date.now();
+  const state = statusState({
+    st,
+    ready: !!db,
+    error: syncError,
+    online: syncState.online !== false,
+    lastContact,
+    dirty,
+    pending: pendingSyncWrites,
+    pushAt: pushInFlight ? pushInFlight.at : 0,
+    desync: syncDesync,
+    now
+  });
+  return { state, lastContact, dirty, error: syncError };
+}
 
 var root: any = typeof window !== 'undefined' ? window : global;
 
@@ -1008,21 +1085,7 @@ root.Sync = {
   getLog: readSyncLog,
   isDirty: () => dirty,
   getSyncError: () => syncError,
-getStatus: () => {
-    const st = getSync();
-    if (!st || !st.paired || !db) return { state: 'off', lastContact, dirty, error: null };
-    if (syncError) return { state: 'error', lastContact, dirty, error: null };
-    const fresh = lastContact && Date.now() - lastContact <= STALE_MS;
-    if ((Sync.online === false && !fresh) || !lastContact || Date.now() - lastContact > STALE_MS) {
-      return { state: 'stale', lastContact, dirty, error: null };
-    }
-    if (dirty || pendingSyncWrites) return { state: 'pending', lastContact, dirty, error: null };
-    if (pushInFlight && Date.now() - pushInFlight.at > DESYNC_SHOW_MS) {
-      return { state: 'desync', lastContact, dirty, error: null };
-    }
-    if (pushInFlight) return { state: 'pending', lastContact, dirty, error: null };
-    return { state: 'synced', lastContact, dirty, error: null };
-  },
+  getStatus: currentStatus,
   init,
   start,
   pair,
@@ -1050,6 +1113,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildOpen,
     buildPushBundle,
     fingerprint,
+    statusState,
     planSweep,
     planMigration
   };
