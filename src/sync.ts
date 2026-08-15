@@ -460,8 +460,39 @@ function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): bool
     if (!local) local = state.days[k] = newDay();
     const r = mergeDay(local, days[k]);
     if (r.changed) { state.days[k] = r.day; changed = true; }
+    const dd = dedupeDay(state.days[k].tasks, state.days);
+    if (dd.dropped) { state.days[k].tasks = dd.tasks; changed = true; }
   });
   return changed;
+}
+
+function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean } {
+  const seen: Record<string, boolean> = {};
+  let dropped = false;
+  const out: TaskShape[] = [];
+  tasks.forEach((t) => {
+    if (!t || !t.id) { out.push(t); return; }
+    const root = rootOf(t, days);
+    if (root) {
+      if (seen[root]) { dropped = true; return; }
+      seen[root] = true;
+    }
+    out.push(t);
+  });
+  return { tasks: out, dropped };
+}
+
+function rootOf(t: TaskShape, days: Record<string, DayShape>): string {
+  let d = t.carriedFrom && t.carriedFrom.day;
+  let id = t.carriedFrom && t.carriedFrom.id;
+  for (let hops = 0; hops < 12 && d && id; hops++) {
+    const pd = days[d];
+    const parent = pd && (pd.tasks || []).find((x) => { return x && x.id === id; });
+    if (!parent || !parent.carriedFrom) return d + ':' + id;
+    d = parent.carriedFrom.day;
+    id = parent.carriedFrom.id;
+  }
+  return (d && id) ? d + ':' + id : '';
 }
 
 function applyRemote(): void {
@@ -1004,6 +1035,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     mergeTask,
     mergeDay,
+    dedupeDay,
     mergeMeta,
     mergeTombstones,
     isTombstoned,

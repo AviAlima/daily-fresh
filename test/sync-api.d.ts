@@ -5,6 +5,7 @@ interface ArchiveMap {
 interface SyncModule {
   mergeTask(lt: TaskShape, rt: TaskShape): { task: TaskShape; changed: boolean };
   mergeDay(local: DayShape, remote: DayShape): { day: DayShape; changed: boolean };
+  dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean };
   mergeMeta(state: AppState, rm: RemoteMeta): { tomorrow: { id: string; text: string }[]; changed: boolean };
   mergeTombstones(a: Tombstone[] | undefined, b: Tombstone[] | undefined): Tombstone[];
   isTombstoned(list: Tombstone[], id: string, ts: TsMap | null): boolean;

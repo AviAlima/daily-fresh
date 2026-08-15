@@ -86,6 +86,32 @@ check('remote task added to local day', () => {
   assert.ok(m.day.tasks.some(t => t.id === 'r'));
   assert.ok(m.changed);
 });
+check('dedupeDay drops same-origin carried copies, keeps first', () => {
+  const days = st({ days: {
+    '2026-08-13': day({ tasks: [T('a', 'origin task', { text: 1000 })] }),
+    '2026-08-14': day({ tasks: [
+      { ...T('c1', 'origin task', { text: 2000 }), carriedFrom: { day: '2026-08-13', id: 'a' } },
+      { ...T('c2', 'origin task', { text: 2000 }), carriedFrom: { day: '2026-08-13', id: 'a' } },
+      T('plain', 'standalone')
+    ] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.ok(res.dropped);
+  assert.equal(res.tasks.length, 2);
+  assert.equal(res.tasks[0].id, 'c1');
+  assert.ok(res.tasks.some(t => t.id === 'plain'));
+});
+check('dedupeDay leaves single-task days untouched', () => {
+  const days = st({ days: {
+    '2026-08-13': day({ tasks: [T('a', 'origin task', { text: 1000 })] }),
+    '2026-08-14': day({ tasks: [
+      { ...T('c1', 'origin task', { text: 2000 }), carriedFrom: { day: '2026-08-13', id: 'a' } }
+    ] })
+  }}).days;
+  const res = S.dedupeDay(days['2026-08-14'].tasks, days);
+  assert.ok(!res.dropped);
+  assert.equal(res.tasks.length, 1);
+});
 check('local task absent remotely is kept', () => {
   const local = day({ tasks: [T('l', 'local only', { done: 1 })], fieldTs: {} });
   const remote = day({ tasks: [T('r', 'remote', { done: 1 })], fieldTs: {} });
