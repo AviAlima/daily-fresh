@@ -123,6 +123,37 @@ async function cleanSeed(page: any) {
 
   console.log('errors:', errors.length ? errors : 'none');
   if (errors.length) { fail++; console.log('  FAIL page errors: ' + errors.join(' | ')); }
+
+  // ---- Mobile: long-press on the task's right edge must NOT be eaten by the modal's X ----
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
+  const mpage = await mctx.newPage();
+  mpage.on('pageerror', (e: any) => console.log('  [mobile pageerror] ' + e.message));
+  await mpage.goto(URL, { waitUntil: 'networkidle' });
+  await cleanSeed(mpage);
+  if (await mpage.$('#onboardModal:not(.hidden)')) {
+    await mpage.fill('#onboardName', 'Mobile');
+    await mpage.click('#onboardStart');
+    await sleep(300);
+  }
+  await addTask(mpage, 'Right edge task');
+  const tbox = await mpage.$eval('#taskList .task', (el: any) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height };
+  });
+  const px = tbox.x + tbox.w - 18, py = tbox.y + tbox.h / 2;
+  const cdp = await mctx.newCDPSession(mpage);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: px, y: py }] });
+  await sleep(800);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(400);
+  const openAfterRelease = await mpage.$eval('#editModal', (el: any) => !el.classList.contains('hidden'));
+  check('long-press at right edge keeps edit open (ghost click on X eaten)', openAfterRelease);
+  await mpage.click('#editClose');
+  await sleep(300);
+  const closedAfterX = await mpage.$eval('#editModal', (el: any) => el.classList.contains('hidden'));
+  check('editing closes via the X button', closedAfterX);
+  await mctx.close();
+
   await browser.close();
   console.log(fail === 0 ? '\nE2E-UI PASSED (' + pass + ' checks)' : '\nE2E-UI FAILED (' + fail + ' failed, ' + pass + ' passed)');
   process.exit(fail === 0 ? 0 : 1);

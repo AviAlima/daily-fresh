@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v68';
+  var APP_VERSION = 'v69';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -990,6 +990,21 @@
 
   /* ================= Edit modal ================= */
 
+  const EDIT_GHOST_WINDOW_MS = 600;
+
+  function suppressGhostClick() {
+    var done = false;
+    function kill(e: MouseEvent) {
+      if (done) return;
+      done = true;
+      e.preventDefault();
+      e.stopPropagation();
+      window.removeEventListener('click', kill, true);
+    }
+    window.addEventListener('click', kill, true);
+    setTimeout(function () { done = true; window.removeEventListener('click', kill, true); }, EDIT_GHOST_WINDOW_MS);
+  }
+
   function openEdit(id: string) {
     var day = today();
     var task = day.tasks.find(function (t) { return t.id === id; });
@@ -1485,6 +1500,7 @@
       if (mousePress && mousePress.armed) {
         var id = mousePress.li.dataset.id;
         mousePress = null;
+        suppressGhostClick();
         if (id) openEdit(id);
         return;
       }
@@ -1556,6 +1572,7 @@
       if (dragIsTouch) { endDrag(true); touchPress = null; return; }
       if (touchPress && touchPress.armed) {
         var id = touchPress.li.dataset.id;
+        suppressGhostClick();
         if (id) openEdit(id);
       }
       touchPress = null;
