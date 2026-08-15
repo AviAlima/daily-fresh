@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v64';
+  var APP_VERSION = 'v65';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -95,6 +95,26 @@
           orderTs: typeof raw.orderTs === 'number' ? raw.orderTs : 0
         };
       }
+      var seen: Record<string, boolean> = {};
+      var prevTasks = s.days[k].tasks;
+      s.days[k].tasks = prevTasks.filter(function (t) {
+        if (!t || !t.id) return true;
+        var d = t.carriedFrom && t.carriedFrom.day;
+        var id = t && t.carriedFrom && t.carriedFrom.id;
+        var hops = 0;
+        while (d && id && hops < 12) {
+          var pd = p.days[d];
+          var parent = pd && (Array.isArray(pd) ? pd : pd.tasks || []).find(function (x: any) { return x && x.id === id; });
+          if (!parent || !parent.carriedFrom) { d = d + ':' + id; id = null; break; }
+          d = parent.carriedFrom.day;
+          id = parent.carriedFrom.id;
+          hops++;
+        }
+        var root = d ? (id ? d + ':' + id : d) : (k + ':' + (t && t.id));
+        if (seen[root]) return false;
+        seen[root] = true;
+        return true;
+      });
     });
     if (typeof p.tomorrowTs === 'number') s.tomorrowTs = p.tomorrowTs;
     if (typeof p.nameTs === 'number') s.nameTs = p.nameTs;
@@ -321,7 +341,7 @@
 
   /* ================= Carry over ================= */
 
-  function rootOrigin(t: TaskShape): string {
+  function rootOrigin(t: TaskShape, dayKey: string): string {
     var d = t.carriedFrom && t.carriedFrom.day;
     var id = t.carriedFrom && t.carriedFrom.id;
     var hops = 0;
@@ -332,14 +352,14 @@
       id = parent.carriedFrom.id;
       hops++;
     }
-    return d ? d + ':' + id : '';
+    return (d && id) ? d + ':' + id : dayKey + ':' + t.id;
   }
 
   function carryCandidates(): { day: string; task: TaskShape }[] {
     var todayTasks = today().tasks;
     var carried: Record<string, boolean> = {};
     todayTasks.forEach(function (t) {
-      var r = rootOrigin(t);
+      var r = rootOrigin(t, activeDay);
       if (r) carried[r] = true;
     });
     var keys = Object.keys(state.days)
@@ -350,7 +370,7 @@
     keys.forEach(function (k) {
       state.days[k].tasks.forEach(function (t) {
         if (!t.done) {
-          var r = rootOrigin(t);
+          var r = rootOrigin(t, k);
           if (!r || !carried[r]) res.push({ day: k, task: t });
         }
       });
@@ -359,6 +379,10 @@
   }
 
   function carryTask(dayKey: string, task: TaskShape, silent?: boolean) {
+    if (today().tasks.some(function (t) { return rootOrigin(t, activeDay) === dayKey + ':' + task.id; })) {
+      if (!silent) toast('Already in today');
+      return;
+    }
     pushUndo();
     var t: TaskShape = {
       id: uid(),
