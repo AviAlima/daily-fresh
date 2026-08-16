@@ -131,6 +131,20 @@ async function longPress(page: any, selector: string) {
   const deskAfterOnline = await openTasks(desk.page);
   check('offline add flushed on reconnect', deskAfterOnline.includes('Offline task'), JSON.stringify(deskAfterOnline));
 
+  // ---- Status pill honesty ----
+  const pill = async (d: Device) => d.page.$eval('#syncStatus', (el: any) => el.textContent);
+  await sleep(3000);
+  const liveAfterSettle = await pill(desk);
+  check('pill says Live after a clean round trip', /Live/.test(liveAfterSettle), liveAfterSettle);
+  await ph.ctx.setOffline(true);
+  await sleep(3000);
+  const pillOffline = await pill(ph);
+  check('pill flips to Offline right away when the network drops', /Offline/.test(pillOffline), pillOffline);
+  await ph.ctx.setOffline(false);
+  await sleep(6000);
+  const pillBack = await pill(ph);
+  check('pill recovers to Live on reconnect', /Live/.test(pillBack), pillBack);
+
   // ---- resetHour syncs across devices ----
   const nowHour = new Date().getHours();
   await desk.page.click('#navSettings');

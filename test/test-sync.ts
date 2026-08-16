@@ -80,9 +80,9 @@ check('stale when no recent server contact', () => {
   assert.equal(S.statusState({ ...statusBase, lastContact: 10000, now: 100000 }), 'stale');
   assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 10000, now: 100000 }), 'stale');
 });
-check('offline with fresh contact stays synced (stale only when contact is missing)', () => {
-  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 100000, now: 100000 }), 'synced');
-  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 95000, now: 100000 }), 'synced');
+check('offline means stale regardless of contact (a device that cannot reach the server is never Live)', () => {
+  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 100000, now: 100000 }), 'stale');
+  assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 95000, now: 100000 }), 'stale');
 });
 check('stale beats pending push without contact', () => {
   assert.equal(S.statusState({ ...statusBase, online: false, lastContact: 0, dirty: true, pushAt: 90000 }), 'stale');

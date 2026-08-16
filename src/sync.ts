@@ -78,8 +78,9 @@ function statusState(input: {
   const { st, ready, error, online, lastContact: contact, dirty, pending, pushAt, desync, now } = input;
   if (!st || !st.paired || !ready) return 'off';
   if (error) return 'error';
+  if (online === false) return 'stale';
   const fresh = contact > 0 && now - contact <= STALE_MS;
-  if ((online === false && !fresh) || !fresh) return 'stale';
+  if (!fresh) return 'stale';
   if (desync || (pushAt > 0 && now - pushAt > DESYNC_SHOW_MS)) return 'desync';
   if (dirty || pending || pushAt > 0) return 'pending';
   return 'synced';
@@ -87,6 +88,7 @@ function statusState(input: {
 
 function touch(): void {
   lastContact = Date.now();
+  syncError = null;
   notifyStatus();
 }
 
@@ -529,7 +531,7 @@ function applyRemote(): void {
     writeLocal(state);
     logEvent('apply', 'merged remote changes into local');
     if (onRemoteCb) onRemoteCb();
-    if (pushInFlight && Date.now() - lastFlushTs > 700) {
+    if (!pushInFlight || Date.now() - lastFlushTs > 700) {
       dirty = true;
       retryFlush();
     }
@@ -742,6 +744,10 @@ function confirmPush(): void {
   if (!pushInFlight || !isPaired() || !initialized) return;
   openDoc.get().then((s: any) => {
     if (!pushInFlight) return;
+    if (s.metadata && s.metadata.fromCache) {
+      logEvent('confirm-read', 'cache-served; leaving push unconfirmed');
+      return;
+    }
     const cur: Record<string, DayShape> = s.exists && s.data() && s.data().days ? s.data().days : {};
     if (fingerprint(cur) === pushInFlight.fg) {
       pushInFlight = null;
@@ -768,16 +774,20 @@ function stopListeners(): void {
 }
 
 function prime(): Promise<void> {
+  let fromCache = true;
   return metaRef.get().then((snap: any) => {
+    fromCache = fromCache && !!(snap.metadata && snap.metadata.fromCache);
     remoteMeta = snap.exists ? snap.data() as RemoteMeta : null;
     return openDoc.get().then((os: any) => {
+      fromCache = fromCache && !!(os.metadata && os.metadata.fromCache);
       remoteOpenDays = os.exists && os.data() && os.data().days ? os.data().days as Record<string, DayShape> : {};
       return archiveCol.get().then((qs: any) => {
+        qs.forEach((d: any) => { if (d.metadata && d.metadata.fromCache) return; fromCache = false; });
         remoteArchives = {};
         qs.forEach((d: any) => { remoteArchives[d.id] = d.data().days as Record<string, DayShape>; });
         initialized = true;
-        touch();
-        logEvent('prime', Object.keys(remoteOpenDays).length + ' open days, ' + qs.size + ' archive docs');
+        if (!fromCache) touch();
+        logEvent('prime', Object.keys(remoteOpenDays).length + ' open days, ' + qs.size + ' archive docs' + (fromCache ? ' (cache)' : ''));
         applyRemote();
       });
     });
@@ -1029,7 +1039,7 @@ function currentStatus(): { state: SyncStatusState; lastContact: number; dirty: 
     st,
     ready: !!db,
     error: syncError,
-    online: syncState.online !== false,
+    online: syncState.online !== false && (typeof navigator === 'undefined' || navigator.onLine !== false),
     lastContact,
     dirty,
     pending: pendingSyncWrites,
