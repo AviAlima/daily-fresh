@@ -1,11 +1,12 @@
 declare const sw: ServiceWorkerGlobalScope;
 
-const CACHE = 'daily-fresh-v70';
+const CACHE = 'daily-fresh-v71';
 
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './styles-v2.css',
   './dist/app.js',
   './dist/sync.js',
   './dist/logic.js',

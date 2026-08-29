@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v70';
+  var APP_VERSION = 'v71';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -403,6 +403,8 @@
     themeSelect: $<HTMLSelectElement>('themeSelect'),
     soundToggle: $<HTMLInputElement>('soundToggle'),
     nameInput: $<HTMLInputElement>('nameInput'),
+    uiNewBtn: $<HTMLButtonElement>('uiNewBtn'),
+    uiClassicBtn: $<HTMLButtonElement>('uiClassicBtn'),
     exportBtn: $<HTMLButtonElement>('exportBtn'),
     importBtn: $<HTMLButtonElement>('importBtn'),
     importFile: $<HTMLInputElement>('importFile'),
@@ -1172,6 +1174,32 @@
     save();
     applyTheme();
     toast('Theme updated');
+  });
+
+  /* ================= Interface (New / Classic) ================= */
+
+  var UI_KEY = 'daily-fresh-ui';
+
+  function applyUi(mode: string) {
+    document.documentElement.dataset.ui = mode === 'classic' ? 'classic' : 'v2';
+    var link = document.getElementById('v2css') as HTMLLinkElement | null;
+    if (link) link.disabled = mode === 'classic';
+    els.uiNewBtn.classList.toggle('active', mode !== 'classic');
+    els.uiClassicBtn.classList.toggle('active', mode === 'classic');
+  }
+
+  try { applyUi(localStorage.getItem(UI_KEY) || 'v2'); } catch (e) { applyUi('v2'); }
+
+  els.uiNewBtn.addEventListener('click', function () {
+    try { localStorage.setItem(UI_KEY, 'v2'); } catch (e) {}
+    applyUi('v2');
+    toast('New look');
+  });
+
+  els.uiClassicBtn.addEventListener('click', function () {
+    try { localStorage.setItem(UI_KEY, 'classic'); } catch (e) {}
+    applyUi('classic');
+    toast('Classic look');
   });
 
   els.soundToggle.addEventListener('change', function () {

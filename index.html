@@ -16,6 +16,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles-v2.css" id="v2css">
+<script>
+(function () {
+  try {
+    var mode = localStorage.getItem('daily-fresh-ui') || 'v2';
+    document.documentElement.dataset.ui = mode;
+    var l = document.getElementById('v2css');
+    if (l && mode === 'classic') l.disabled = true;
+  } catch (e) { document.documentElement.dataset.ui = 'v2'; }
+})();
+</script>
 </head>
 <body>
 <div class="app">
@@ -242,6 +253,17 @@
           <option value="dark">Dark</option>
           <option value="light">Light</option>
         </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <span>Interface</span>
+          <span class="setting-sub">New look or the classic one</span>
+        </div>
+        <div class="seg" id="uiSeg">
+          <button class="timer-btn" id="uiNewBtn">New</button>
+          <button class="timer-btn" id="uiClassicBtn">Classic</button>
+        </div>
       </div>
 
       <div class="setting-row">

@@ -51,7 +51,33 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // version
   const ver = await page.$eval('#appVersion', (el: any) => el.textContent);
   console.log('version:', ver);
-  if (ver !== 'v70') throw new Error('version mismatch: ' + ver);
+  if (ver !== 'v71') throw new Error('version mismatch: ' + ver);
+
+  // interface: v2 default, classic toggle restores the old stylesheet
+  const uiDefault = await page.evaluate(() => ({
+    ui: document.documentElement.dataset.ui,
+    v2live: !(document.getElementById('v2css') as any).disabled
+  }));
+  console.log('interface default:', JSON.stringify(uiDefault));
+  if (uiDefault.ui !== 'v2' || !uiDefault.v2live) throw new Error('v2 interface should be the default');
+  await page.click('#navSettings');
+  await page.waitForTimeout(200);
+  await page.click('#uiClassicBtn');
+  await page.waitForTimeout(200);
+  const uiClassic = await page.evaluate(() => ({
+    ui: document.documentElement.dataset.ui,
+    v2off: (document.getElementById('v2css') as any).disabled,
+    stored: localStorage.getItem('daily-fresh-ui')
+  }));
+  console.log('interface after classic:', JSON.stringify(uiClassic));
+  if (uiClassic.ui !== 'classic' || !uiClassic.v2off || uiClassic.stored !== 'classic') throw new Error('classic toggle failed: ' + JSON.stringify(uiClassic));
+  await page.click('#uiNewBtn');
+  await page.waitForTimeout(200);
+  const uiBack = await page.evaluate(() => (document.getElementById('v2css') as any).disabled);
+  if (uiBack) throw new Error('switching back to new failed');
+  await page.reload({ waitUntil: 'networkidle' });
+  const uiPersisted = await page.evaluate(() => document.documentElement.dataset.ui);
+  if (uiPersisted !== 'v2') throw new Error('ui preference did not persist across reload: ' + uiPersisted);
 
   // history view
   await page.click('#navHistory');
