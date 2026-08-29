@@ -51,7 +51,7 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // version
   const ver = await page.$eval('#appVersion', (el: any) => el.textContent);
   console.log('version:', ver);
-  if (ver !== 'v72') throw new Error('version mismatch: ' + ver);
+  if (ver !== 'v73') throw new Error('version mismatch: ' + ver);
 
   // interface: v2 default, classic toggle restores the old stylesheet
   const uiDefault = await page.evaluate(() => ({

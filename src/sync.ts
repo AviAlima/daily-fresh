@@ -491,6 +491,13 @@ function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): { ch
     const dd = dedupeDay(state.days[k].tasks, state.days);
     if (dd.dropped) {
       state.days[k].tasks = dd.tasks;
+      if (!Array.isArray(state.days[k].tombstones)) state.days[k].tombstones = [];
+      const at = Date.now();
+      dd.droppedIds.forEach((id) => {
+        if (!state.days[k].tombstones.some((tb: any) => tb && tb.id === id)) {
+          state.days[k].tombstones.push({ id: id, deletedAt: at });
+        }
+      });
       changed = true;
       normalized = true;
     }
@@ -498,7 +505,7 @@ function applyDaysToLocal(state: AppState, days: Record<string, DayShape>): { ch
   return { changed, normalized };
 }
 
-function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean } {
+function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks: TaskShape[]; dropped: boolean; droppedIds: string[] } {
   return Logic.dedupeDay(tasks, days, '');
 }
 

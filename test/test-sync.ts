@@ -258,6 +258,24 @@ check('pushDay includes tombstones', () => {
   const doc = S.pushDay(local, remote, Date.now());
   assert.equal(doc.tombstones.length, 1);
 });
+check('duplicate dropped by dedupe is tombstoned so the cloud cannot resurrect it', () => {
+  const origin = T('orig', 'the task');
+  const mkCopy = (id: string) => ({ ...T(id, 'the task'), carriedFrom: { day: '2026-08-08', id: 'orig' } });
+  const remoteDay = day({ tasks: [origin, mkCopy('c1'), mkCopy('c2')] });
+  const local = day({ tasks: [origin] });
+  const merged = S.mergeDay(local, remoteDay);
+  const dd = (global as any).Logic.dedupeDay(merged.day.tasks, {}, '');
+  assert.ok(dd.dropped);
+  assert.equal(dd.tasks.length, 1);
+  const healed: DayShape = {
+    ...day({ tasks: dd.tasks }),
+    tombstones: dd.droppedIds.map((id: string) => ({ id, deletedAt: Date.now() }))
+  };
+  const doc = S.pushDay(healed, remoteDay, Date.now());
+  assert.equal(doc.tasks.length, 1, 'pushed day must not contain the tombstoned duplicates');
+  const again = S.mergeDay(healed, doc);
+  assert.equal(again.day.tasks.length, 1, 'merged day stays single-copy across cycles');
+});
 check('pushDay: remote tombstone blocks stale copy but allows undo (newer ts)', () => {
   const local = day({
     tasks: [

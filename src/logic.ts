@@ -149,28 +149,29 @@
     return (d && id) ? d + ':' + id : dayKey + ':' + t.id;
   }
 
-  function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean } {
+  function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean; droppedIds: string[] } {
     const seenRoot: Record<string, boolean> = {};
     const seenText: Record<string, boolean> = {};
     let dropped = false;
+    const droppedIds: string[] = [];
     const out: TaskShape[] = [];
     tasks.forEach(function (t) {
       if (!t || !t.id) { out.push(t); return; }
       const root = rootOf(t, days, fallbackKey || '');
       if (root) {
-        if (seenRoot[root]) { dropped = true; return; }
+        if (seenRoot[root]) { dropped = true; droppedIds.push(t.id); return; }
         seenRoot[root] = true;
       }
       if (!t.done && t.text) {
         const normText = t.text.trim().toLowerCase();
         if (normText) {
-          if (seenText[normText]) { dropped = true; return; }
+          if (seenText[normText]) { dropped = true; droppedIds.push(t.id); return; }
           seenText[normText] = true;
         }
       }
       out.push(t);
     });
-    return { tasks: out, dropped };
+    return { tasks: out, dropped: dropped, droppedIds: droppedIds };
   }
 
   function carryCandidates(days: Record<string, DayShape>, activeDay: string): { day: string; task: TaskShape }[] {
@@ -225,7 +226,16 @@
         };
       }
       const dd = dedupeDay(s.days[k].tasks, s.days, k);
-      if (dd.dropped) s.days[k].tasks = dd.tasks;
+      if (dd.dropped) {
+        s.days[k].tasks = dd.tasks;
+        if (!Array.isArray(s.days[k].tombstones)) s.days[k].tombstones = [];
+        const at = Date.now();
+        dd.droppedIds.forEach(function (id) {
+          if (!s.days[k].tombstones.some(function (tb: any) { return tb && tb.id === id; })) {
+            s.days[k].tombstones.push({ id: id, deletedAt: at });
+          }
+        });
+      }
     });
     if (typeof p.tomorrowTs === 'number') s.tomorrowTs = p.tomorrowTs;
     if (typeof p.nameTs === 'number') s.nameTs = p.nameTs;

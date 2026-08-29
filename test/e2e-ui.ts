@@ -121,6 +121,30 @@ async function cleanSeed(page: any) {
   const badgeAfter = await page.$eval('#navToday .carry-count', (el: any) => el ? el.textContent : null).catch(() => null);
   check('carry badge clears after carrying', badgeAfter === null, 'badge=' + badgeAfter);
 
+  // ---- Bring-all with an origin AND its carried copy must not duplicate (root-based guard) ----
+  await page.evaluate(() => {
+    const Logic = (window as any).Logic;
+    const resetHour = 5;
+    const today = Logic.currentDayKey(new Date(), resetHour);
+    const y = Logic.shiftKey(today, -1);
+    const o = Logic.shiftKey(today, -2);
+    const origin = { id: 'orig', text: 'Stacked task', done: false, estimate: 0, order: 0, carriedFrom: null, created: '2026-01-01T00:00:00.000Z', doneAt: null, ts: null };
+    const copy = { id: 'c1', text: 'Stacked task', done: false, estimate: 0, order: 0, carriedFrom: { day: o, id: 'orig' }, created: '2026-01-01T00:00:00.000Z', doneAt: null, ts: null };
+    const mkDay = (tasks: any[]) => ({ tasks, note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 });
+    const state = { settings: { resetHour, theme: 'dark', sound: false, name: 'E2E' }, days: { [o]: mkDay([origin]), [y]: mkDay([copy]), [today]: mkDay([]) }, onboarded: true, activeDay: today };
+    localStorage.setItem('daily-fresh-state-v2', JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await sleep(400);
+  const stackedBadge = await page.$eval('#navToday .carry-count', (el: any) => el ? el.textContent : null).catch(() => null);
+  check('origin and its copy both offered (2 candidates)', stackedBadge === '2', 'badge=' + stackedBadge);
+  await page.click('#carryToggle');
+  await sleep(250);
+  await page.click('#carryAll');
+  await sleep(400);
+  const stackedCount = await page.$$eval('#taskList .task', (els: any[]) => els.filter((e: any) => e.querySelector('.task-text').textContent === 'Stacked task').length);
+  check('bring-all of origin+copy creates exactly one task', stackedCount === 1, 'count=' + stackedCount);
+
   console.log('errors:', errors.length ? errors : 'none');
   if (errors.length) { fail++; console.log('  FAIL page errors: ' + errors.join(' | ')); }
 

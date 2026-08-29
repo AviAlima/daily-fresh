@@ -165,6 +165,24 @@ check('migrate strips carried-chained duplicates', () => {
   const s = L.migrate({ days: { '2026-08-09': day({ tasks: [mk('c1'), mk('c2')] }) } });
   assert.equal(s.days['2026-08-09'].tasks.length, 1);
 });
+check('migrate tombstones the dropped duplicates', () => {
+  const mk = (id: string) => ({ ...T(id, 'the task'), carriedFrom: { day: '2026-08-08', id: 'orig' } });
+  const s = L.migrate({ days: { '2026-08-09': day({ tasks: [mk('c1'), mk('c2')] }) } });
+  const tbs = s.days['2026-08-09'].tombstones;
+  assert.equal(tbs.length, 1);
+  assert.equal(tbs[0].id, 'c2');
+  const s2 = L.migrate({ days: { '2026-08-10': day({ tasks: [T('a', 'Renew license'), T('b', 'Renew license')] }) } });
+  assert.equal(s2.days['2026-08-10'].tombstones.length, 1);
+  assert.equal(s2.days['2026-08-10'].tombstones[0].id, 'b');
+});
+check('dedupeDay reports dropped ids for root and text dupes', () => {
+  const days: any = { '2026-08-08': day({ tasks: [T('orig', 'the task')] }) };
+  const mk = (id: string) => ({ ...T(id, 'the task'), carriedFrom: { day: '2026-08-08', id: 'orig' } });
+  const r1 = L.dedupeDay([mk('c1'), mk('c2')], days, '2026-08-09');
+  assert.deepEqual(r1.droppedIds, ['c2']);
+  const r2 = L.dedupeDay([T('x', 'Same text'), T('y', 'same text')], {}, '2026-08-09');
+  assert.deepEqual(r2.droppedIds, ['y']);
+});
 check('migrate strips same-text duplicates across carried null', () => {
   const s = L.migrate({ days: { '2026-08-10': day({ tasks: [T('a', 'Renew license'), T('b', 'Renew license')] }) } });
   assert.equal(s.days['2026-08-10'].tasks.length, 1);

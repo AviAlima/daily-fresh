@@ -68,7 +68,7 @@ interface LogicApi {
   streak(days: Record<string, DayShape>, activeDay: string): number;
   greeting(now: Date, name: string): string;
   rootOf(t: TaskShape, days: Record<string, DayShape>, dayKey: string): string;
-  dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean };
+  dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean; droppedIds: string[] };
   carryCandidates(days: Record<string, DayShape>, activeDay: string): { day: string; task: TaskShape }[];
   migrate(p: unknown): AppState;
 }
