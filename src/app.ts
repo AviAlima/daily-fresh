@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v77';
+  var APP_VERSION = 'v78';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -425,8 +425,12 @@
     themeSelect: $<HTMLSelectElement>('themeSelect'),
     soundToggle: $<HTMLInputElement>('soundToggle'),
     nameInput: $<HTMLInputElement>('nameInput'),
-    uiNewBtn: $<HTMLButtonElement>('uiNewBtn'),
+    uiZenBtn: $<HTMLButtonElement>('uiZenBtn'),
+    uiFocusBtn: $<HTMLButtonElement>('uiFocusBtn'),
+    uiDashBtn: $<HTMLButtonElement>('uiDashBtn'),
     uiClassicBtn: $<HTMLButtonElement>('uiClassicBtn'),
+    dashStrip: $('dashStrip'),
+    notesToggle: $<HTMLButtonElement>('notesToggle'),
     exportBtn: $<HTMLButtonElement>('exportBtn'),
     importBtn: $<HTMLButtonElement>('importBtn'),
     importFile: $<HTMLInputElement>('importFile'),
@@ -663,6 +667,26 @@
     }
   }
 
+  function renderDash() {
+    var el = els.dashStrip;
+    if (!el) return;
+    var keys = lastKeys(7);
+    var done7 = 0, total7 = 0;
+    keys.forEach(function (k) { var s = dayStats(k); done7 += s.done; total7 += s.total; });
+    var s0 = dayStats(activeDay);
+    var rate = total7 ? Math.round((done7 / total7) * 100) + '%' : '0%';
+    var bars = keys.map(function (k) {
+      var s = dayStats(k);
+      var pct = s.total ? Math.max(6, Math.round(s.ratio * 100)) : 6;
+      return '<span class="dash-bar' + (k === activeDay ? ' today' : '') + '"><i style="height:' + pct + '%"></i></span>';
+    }).join('');
+    el.innerHTML =
+      '<div class="dash-cell"><b>' + streak() + '</b><i>streak</i></div>' +
+      '<div class="dash-cell"><b>' + s0.done + '/' + s0.total + '</b><i>today</i></div>' +
+      '<div class="dash-cell"><b>' + rate + '</b><i>7-day</i></div>' +
+      '<div class="dash-bars">' + bars + '</div>';
+  }
+
   function renderToday() {
     var day = today();
     var tasks = orderedTasks(day.tasks);
@@ -672,6 +696,7 @@
     var g = greeting();
     if (g !== lastGreeting) { els.greeting.textContent = g; lastGreeting = g; }
     els.dayDate.textContent = fullDateLabel(activeDay);
+    renderDash();
 
     els.taskList.innerHTML = open.map(function (t) { return taskHtml(t, activeDay); }).join('');
 
@@ -1198,31 +1223,57 @@
     toast('Theme updated');
   });
 
-  /* ================= Interface (New / Classic) ================= */
+  /* ================= Interface (Zen / Focus / Dashboard / Classic) ================= */
 
   var UI_KEY = 'daily-fresh-ui';
+  var UI_MODES = ['zen', 'focus', 'dashboard', 'classic'];
 
-  function applyUi(mode: string) {
-    document.documentElement.dataset.ui = mode === 'classic' ? 'classic' : 'v2';
-    var link = document.getElementById('v2css') as HTMLLinkElement | null;
-    if (link) link.disabled = mode === 'classic';
-    els.uiNewBtn.classList.toggle('active', mode !== 'classic');
-    els.uiClassicBtn.classList.toggle('active', mode === 'classic');
+  function normalizeUi(v: string | null): string {
+    if (v === 'classic' || v === 'focus' || v === 'dashboard') return v;
+    return 'zen';
   }
 
-  try { applyUi(localStorage.getItem(UI_KEY) || 'v2'); } catch (e) { applyUi('v2'); }
+  function applyUi(mode: string) {
+    var m = normalizeUi(mode);
+    document.documentElement.dataset.ui = m;
+    var link = document.getElementById('v2css') as HTMLLinkElement | null;
+    if (link) link.disabled = m === 'classic';
+    els.uiZenBtn.classList.toggle('active', m === 'zen');
+    els.uiFocusBtn.classList.toggle('active', m === 'focus');
+    els.uiDashBtn.classList.toggle('active', m === 'dashboard');
+    els.uiClassicBtn.classList.toggle('active', m === 'classic');
+    els.dashStrip.classList.toggle('hidden', m !== 'dashboard');
+  }
 
-  els.uiNewBtn.addEventListener('click', function () {
-    try { localStorage.setItem(UI_KEY, 'v2'); } catch (e) {}
-    applyUi('v2');
-    toast('New look');
+  function updateHeroIcon() {
+    var h = new Date().getHours();
+    var el = document.getElementById('heroIcon');
+    if (el) el.classList.toggle('night', h < 5 || h >= 18);
+    var sun = el ? el.querySelector('.ic-sun') : null;
+    var moon = el ? el.querySelector('.ic-moon') : null;
+    var night = el ? el.classList.contains('night') : false;
+    if (sun) (sun as HTMLElement).style.display = night ? 'none' : '';
+    if (moon) (moon as HTMLElement).style.display = night ? 'block' : 'none';
+  }
+  updateHeroIcon();
+  setInterval(updateHeroIcon, 60000);
+
+  els.notesToggle.addEventListener('click', function () {
+    document.body.classList.toggle('notes-open');
   });
 
-  els.uiClassicBtn.addEventListener('click', function () {
-    try { localStorage.setItem(UI_KEY, 'classic'); } catch (e) {}
-    applyUi('classic');
-    toast('Classic look');
-  });
+  try { applyUi(normalizeUi(localStorage.getItem(UI_KEY))); } catch (e) { applyUi('zen'); }
+
+  function setUi(mode: string) {
+    try { localStorage.setItem(UI_KEY, mode); } catch (e) {}
+    applyUi(mode);
+    toast(mode === 'classic' ? 'Classic look' : mode === 'focus' ? 'Focus layout' : mode === 'dashboard' ? 'Dashboard layout' : 'Zen layout');
+  }
+
+  els.uiZenBtn.addEventListener('click', function () { setUi('zen'); });
+  els.uiFocusBtn.addEventListener('click', function () { setUi('focus'); });
+  els.uiDashBtn.addEventListener('click', function () { setUi('dashboard'); });
+  els.uiClassicBtn.addEventListener('click', function () { setUi('classic'); });
 
   els.soundToggle.addEventListener('change', function () {
     state.settings.sound = els.soundToggle.checked;

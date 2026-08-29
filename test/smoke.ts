@@ -51,17 +51,32 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // version
   const ver = await page.$eval('#appVersion', (el: any) => el.textContent);
   console.log('version:', ver);
-  if (ver !== 'v77') throw new Error('version mismatch: ' + ver);
+  if (ver !== 'v78') throw new Error('version mismatch: ' + ver);
 
-  // interface: v2 default, classic toggle restores the old stylesheet
+  // interface: zen default, all four modes switch and persist
   const uiDefault = await page.evaluate(() => ({
     ui: document.documentElement.dataset.ui,
-    v2live: !(document.getElementById('v2css') as any).disabled
+    v2live: !(document.getElementById('v2css') as any).disabled,
+    dashHidden: document.getElementById('dashStrip')!.classList.contains('hidden')
   }));
   console.log('interface default:', JSON.stringify(uiDefault));
-  if (uiDefault.ui !== 'v2' || !uiDefault.v2live) throw new Error('v2 interface should be the default');
+  if (uiDefault.ui !== 'zen' || !uiDefault.v2live || !uiDefault.dashHidden) throw new Error('zen should be the default: ' + JSON.stringify(uiDefault));
   await page.click('#navSettings');
   await page.waitForTimeout(200);
+  await page.click('#uiDashBtn');
+  await page.waitForTimeout(200);
+  const uiDash = await page.evaluate(() => ({
+    ui: document.documentElement.dataset.ui,
+    stripVisible: !document.getElementById('dashStrip')!.classList.contains('hidden'),
+    cells: document.querySelectorAll('.dash-cell').length,
+    stored: localStorage.getItem('daily-fresh-ui')
+  }));
+  console.log('interface after dashboard:', JSON.stringify(uiDash));
+  if (uiDash.ui !== 'dashboard' || uiDash.cells < 3) throw new Error('dashboard toggle failed: ' + JSON.stringify(uiDash));
+  await page.click('#uiFocusBtn');
+  await page.waitForTimeout(200);
+  const uiFocus = await page.evaluate(() => document.documentElement.dataset.ui);
+  if (uiFocus !== 'focus') throw new Error('focus switch failed: ' + uiFocus);
   await page.click('#uiClassicBtn');
   await page.waitForTimeout(200);
   const uiClassic = await page.evaluate(() => ({
@@ -71,13 +86,13 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   }));
   console.log('interface after classic:', JSON.stringify(uiClassic));
   if (uiClassic.ui !== 'classic' || !uiClassic.v2off || uiClassic.stored !== 'classic') throw new Error('classic toggle failed: ' + JSON.stringify(uiClassic));
-  await page.click('#uiNewBtn');
+  await page.click('#uiZenBtn');
   await page.waitForTimeout(200);
-  const uiBack = await page.evaluate(() => (document.getElementById('v2css') as any).disabled);
-  if (uiBack) throw new Error('switching back to new failed');
+  const uiBack = await page.evaluate(() => ({ ui: document.documentElement.dataset.ui, v2on: !(document.getElementById('v2css') as any).disabled }));
+  if (uiBack.ui !== 'zen' || !uiBack.v2on) throw new Error('switching back to zen failed');
   await page.reload({ waitUntil: 'networkidle' });
   const uiPersisted = await page.evaluate(() => document.documentElement.dataset.ui);
-  if (uiPersisted !== 'v2') throw new Error('ui preference did not persist across reload: ' + uiPersisted);
+  if (uiPersisted !== 'zen') throw new Error('ui preference did not persist across reload: ' + uiPersisted);
 
   // history view
   await page.click('#navHistory');
