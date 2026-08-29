@@ -234,6 +234,77 @@ async function cleanSeed(page: any) {
     await sleep(300);
   }
   await addTask(mpage, 'Right edge task');
+
+  // ---- WhatsApp-style keyboard drag-dismiss on the mobile context ----
+  // Synthetic TouchEvents (Chromium's native tap-outside blur would mask the
+  // gesture logic with real CDP touches).
+  await mpage.evaluate(() => { document.body.classList.add('keyboard-open'); });
+  await mpage.fill('#taskInput', 'Gesture task'); await mpage.press('#taskInput', 'Enter'); await sleep(300);
+  const focusAndTrack = async () => {
+    await mpage.focus('#taskInput');
+    await mpage.evaluate(() => {
+      (window as any).__log = [];
+      document.addEventListener('focusout', (e: any) => {
+        (window as any).__log.push('out:' + (e.target.id || e.target.tagName));
+      }, true);
+    });
+  };
+  const focused = () => mpage.evaluate(() => (document.activeElement as HTMLElement)?.id || (document.activeElement as HTMLElement)?.tagName || 'none');
+  const swipe = (from: { x: number; y: number }, path: Array<[number, number]>) => mpage.evaluate(([from, path]: any) => {
+    function fire(type: string, x: number, y: number) {
+      const tgt = document.elementFromPoint(x, y) || document.body;
+      const t = new Touch({ identifier: 1, target: tgt, clientX: x, clientY: y });
+      tgt.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] }));
+    }
+    fire('touchstart', from[0] !== undefined ? from[0] : from.x, from[1] !== undefined ? from[1] : from.y);
+    (path as Array<[number, number]>).forEach(([x, y]) => fire('touchmove', x, y));
+    fire('touchend', 0, 0);
+    return (document.querySelector('.app') as HTMLElement).style.transform;
+  }, [from, path] as any);
+  const ptAt = (x: number, y: number) => mpage.evaluate(([x, y]: any) => {
+    const el = document.elementFromPoint(x, y);
+    return { x, y, on: el ? (el.closest('.task') ? 'task' : (el.id || el.className || el.tagName)) : 'none' };
+  }, [x, y] as any) as any;
+  // locate a background point (below the last task)
+  const bg = await mpage.evaluate(() => {
+    const els = Array.from(document.querySelectorAll('#taskList .task'));
+    const last = els[els.length - 1] as HTMLElement;
+    return { y: Math.round(last.getBoundingClientRect().bottom + 60) };
+  });
+  // 1) small drag below ~0.75cm (44px) → snaps back, keyboard stays
+  await focusAndTrack();
+  await swipe({ x: 300, y: bg.y - 40 }, [[300, bg.y - 30], [300, bg.y - 20], [300, bg.y - 10], [300, bg.y - 10]]);
+  let st1 = await focused();
+  check('small drag snaps back (keyboard stays)', st1 === 'taskInput', st1);
+  // 2) long drag (>= 44px) → dismisses
+  await focusAndTrack();
+  await swipe({ x: 300, y: bg.y - 40 }, [[300, bg.y], [300, bg.y + 20], [300, bg.y + 10], [300, bg.y + 20]]);
+  let st2 = await focused();
+  check('long drag past ~0.75cm dismisses the keyboard', st2 !== 'taskInput', st2);
+  // 3) horizontal move from background → no dismiss
+  await focusAndTrack();
+  await swipe({ x: 150, y: bg.y }, [[210, bg.y], [240, bg.y], [260, bg.y], [260, bg.y]]);
+  const st3 = await focused();
+  check('horizontal drag does not dismiss', st3 === 'taskInput', st3);
+  // 4) drag starting on a task is ignored (belongs to reorder/long-press)
+  await focusAndTrack();
+  const ty = await mpage.evaluate(() => {
+    const r = document.querySelector('#taskList .task')!.getBoundingClientRect();
+    return Math.round(r.top + r.height / 2);
+  });
+  await swipe({ x: 200, y: ty }, [[200, ty + 12], [200, ty + 30], [200, ty + 50], [200, ty + 70]]);
+  const st4 = await focused();
+  check('drag starting on a task does not dismiss', st4 === 'taskInput', st4);
+  // 5) tap on the content closes the keyboard
+  await focusAndTrack();
+  await swipe({ x: 200, y: ty }, []);
+  const st4b = await focused();
+  check('tap on the content closes the keyboard', st4b !== 'taskInput', st4b);
+  // 6) the + button closes the keyboard after adding
+  await focusAndTrack();
+  await mpage.fill('#taskInput', 'Plus close'); await mpage.click('#addBtn'); await sleep(300);
+  const st5 = await focused();
+  check('+ closes the keyboard after adding', st5 !== 'taskInput', st5);
   const tbox = await mpage.$eval('#taskList .task', (el: any) => {
     const r = el.getBoundingClientRect();
     return { x: r.x, y: r.y, w: r.width, h: r.height };

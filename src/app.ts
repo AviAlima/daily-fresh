@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v79';
+  var APP_VERSION = 'v80';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -1013,6 +1013,7 @@
 
   $('addBtn').addEventListener('click', function () {
     addCurrentTask();
+    dismissKeyboard();
   });
 
   els.taskInput.addEventListener('keydown', function (e) {
@@ -1628,7 +1629,6 @@
 
   dragLists.forEach(function (list) {
     list.addEventListener('touchstart', function (e) {
-      if (document.body.classList.contains('keyboard-open')) dismissKeyboard();
       var t = e.target as HTMLElement | null;
       if (!t) return;
       var li = t.closest<HTMLElement>('.task') as HTMLElement;
@@ -1961,6 +1961,72 @@
     var ae = document.activeElement as HTMLElement | null;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
   }
+
+  /* ================= WhatsApp-style keyboard drag-dismiss =================
+     With the keyboard open, dragging down anywhere on the content slides the
+     page down with the finger; releasing past ~0.75cm (~44pt on iPhone)
+     dismisses the keyboard, below it snaps back. Starts only on background
+     areas so it never fights task long-press or drag-reorder. */
+  var KB_DISMISS_MIN = 44;
+  var kbDrag: { startY: number; startX: number; dy: number; active: boolean; passive: boolean; el: HTMLElement } | null = null;
+
+  function kbDragApp(): HTMLElement | null {
+    return document.querySelector('.app');
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    if (!document.body.classList.contains('keyboard-open')) return;
+    if (kbDrag || e.touches.length !== 1) return;
+    var t = e.target as HTMLElement | null;
+    if (!t || t.closest('button, input, textarea, select, a, .modal-backdrop')) return;
+    var el = kbDragApp();
+    if (!el) return;
+    // Touches on tasks are tap-dismiss only — the move gesture belongs to
+    // the drag-reorder/long-press system.
+    var passive = !!t.closest('.task');
+    kbDrag = { startY: e.touches[0].clientY, startX: e.touches[0].clientX, dy: 0, active: false, passive: passive, el: el };
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!kbDrag) return;
+    var dy = e.touches[0].clientY - kbDrag.startY;
+    var dx = e.touches[0].clientX - kbDrag.startX;
+    if (!kbDrag.active) {
+      if (kbDrag.passive) { kbDrag = null; return; }
+      // Decide the gesture intent on the first significant movement.
+      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+      if (dy <= 8 || Math.abs(dx) > Math.abs(dy)) { kbDrag = null; return; }
+      kbDrag.active = true;
+      kbDrag.startY = e.touches[0].clientY - dy;
+      kbDrag.dy = 0;
+    }
+    if (e.cancelable) e.preventDefault();
+    dy = Math.max(0, dy);
+    kbDrag.dy = dy;
+    kbDrag.el.style.transition = 'none';
+    kbDrag.el.style.transform = 'translateY(' + Math.min(120, dy * 0.6) + 'px)';
+  }, { passive: false });
+
+  function kbDragEnd() {
+    if (!kbDrag) return;
+    var d = kbDrag;
+    kbDrag = null;
+    if (d.active) {
+      d.el.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1)';
+      d.el.style.transform = '';
+      if (d.dy >= KB_DISMISS_MIN) dismissKeyboard();
+    } else if (d.dy < 8) {
+      // A tap (no meaningful movement) on the content closes the keyboard.
+      dismissKeyboard();
+    }
+  }
+  document.addEventListener('touchend', kbDragEnd, { passive: true });
+  document.addEventListener('touchcancel', function () {
+    if (!kbDrag) return;
+    var d = kbDrag;
+    kbDrag = null;
+    if (d.active) { d.el.style.transition = 'transform 0.2s ease-out'; d.el.style.transform = ''; }
+  }, { passive: true });
 
   /* ================= Keyboard focus helpers ================= */
 
