@@ -181,6 +181,16 @@
       const r = rootOf(t, days, activeDay);
       if (r) carried[r] = true;
     });
+    // dedupeDay collapses uncompleted same-text tasks within a day, so a
+    // candidate whose text is already open in today would be bounced right
+    // back — don't offer it.
+    const openText: Record<string, boolean> = {};
+    todayTasks.forEach(function (t) {
+      if (t && !t.done && t.text) {
+        const n = t.text.trim().toLowerCase();
+        if (n) openText[n] = true;
+      }
+    });
     const past = Object.keys(days)
       .filter(function (k) { return k < activeDay; })
       .sort();
@@ -202,6 +212,7 @@
         if (!t || t.done) return;
         const r = rootOf(t, days, k);
         if (!r || carried[r]) return;
+        if (t.text && openText[t.text.trim().toLowerCase()]) return;
         const top = latest[r];
         if (top && top.day === k && top.id === t.id && !top.done) res.push({ day: k, task: t });
       });

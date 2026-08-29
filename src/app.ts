@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v75';
+  var APP_VERSION = 'v76';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -256,7 +256,12 @@
 
   function carryTask(dayKey: string, task: TaskShape, silent?: boolean) {
     var root = rootOrigin(task, dayKey);
-    if (today().tasks.some(function (t) { return rootOrigin(t, activeDay) === root; })) {
+    var normText = task.text ? task.text.trim().toLowerCase() : '';
+    var taken = today().tasks.some(function (t) {
+      if (rootOrigin(t, activeDay) === root) return true;
+      return !!(normText && !t.done && t.text && t.text.trim().toLowerCase() === normText);
+    });
+    if (taken) {
       if (!silent) toast('Already in today');
       return;
     }

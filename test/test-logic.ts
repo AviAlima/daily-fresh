@@ -169,6 +169,19 @@ check('carryCandidates hides the whole chain once the newest copy is done', () =
   const res = L.carryCandidates(days, '2026-08-29');
   assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), []);
 });
+check('carryCandidates hides candidates whose text is already open in today (dedupe would bounce them)', () => {
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-28': day({ tasks: [{ ...T('c1', 'the task'), carriedFrom: { day: '2026-08-19', id: 'orig' } }] }),
+    '2026-08-29': day({ tasks: [T('stale', 'THE TASK')] })
+  };
+  const res = L.carryCandidates(days, '2026-08-29');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), []);
+  const days2 = JSON.parse(JSON.stringify(days));
+  (days2['2026-08-29'].tasks[0] as any).done = true;
+  const res2 = L.carryCandidates(days2, '2026-08-29');
+  assert.deepEqual(res2.map((r: { task: TaskShape }) => r.task.id), ['c1'], 'done same-text must not hide the candidate');
+});
 
 console.log('migrate');
 check('migrate normalizes legacy array days', () => {
