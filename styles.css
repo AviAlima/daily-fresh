@@ -45,9 +45,11 @@ html[data-theme="light"] {
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; }
 
 html, body { height: 100%; }
+
+body { overflow-x: clip; }
 
 input, textarea, button, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
@@ -1551,12 +1553,22 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .note-card textarea,
   .onboard-name input { font-size: 16px; }
 
-  h1 { font-size: 22px; }
+  h1 { font-size: 19px; }
+
+  .date { display: none; }
+
+  .streak-pill { display: none; }
+
+  .kbd-hint { display: none; }
+
+  .topbar { margin-bottom: 18px; gap: 10px; }
+
+  .top-right { flex-shrink: 0; }
 
   .ring { width: 34px; height: 34px; }
   .top-right { gap: 10px; }
   .sync-pill { padding: 3px 8px; font-size: 11px; }
-  .sync-pill .sync-label { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+  .sync-pill .sync-label { max-width: 74px; overflow: hidden; text-overflow: ellipsis; }
 
   .focus-body { flex-direction: column; align-items: flex-start; gap: 10px; }
   .focus-start { width: 100%; justify-content: center; }

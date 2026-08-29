@@ -69,9 +69,11 @@ html[data-theme="light"] {
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; }
 
 html, body { height: 100%; }
+
+body { overflow-x: clip; }
 
 input, textarea, button, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
@@ -244,8 +246,11 @@ html[data-theme="light"] .sidebar { background: rgba(255, 255, 255, 0.6); }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 30px;
 }
+
+.topbar > div:first-child { min-width: 0; }
 
 h1 {
   font-size: 30px;
@@ -255,6 +260,9 @@ h1 {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .date { margin-top: 6px; font-size: 13.5px; color: var(--text-faint); font-weight: 550; letter-spacing: 0.01em; }
@@ -1840,13 +1848,22 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
   .note-card textarea,
   .onboard-name input { font-size: 16px; }
 
-  h1 { font-size: 24px; }
+  h1 { font-size: 19px; }
 
-  .topbar { margin-bottom: 24px; }
-  .ring { width: 38px; height: 38px; }
-  .top-right { gap: 10px; }
+  .date { display: none; }
+
+  /* Declutter: streak belongs to History; ring + sync pill stay */
+  .streak-pill { display: none; }
+
+  .kbd-hint { display: none; }
+
+  .topbar { margin-bottom: 18px; gap: 10px; }
+
+  .top-right { flex-shrink: 0; }
+  .ring { width: 34px; height: 34px; }
+  .ring-count { min-width: 28px; font-size: 11.5px; }
   .sync-pill { padding: 4px 9px; font-size: 11px; }
-  .sync-pill .sync-label { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+  .sync-pill .sync-label { max-width: 74px; overflow: hidden; text-overflow: ellipsis; }
 
   .task { padding: 13px 14px; }
   .task:hover { transform: none; }
