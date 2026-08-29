@@ -2080,22 +2080,25 @@ html[data-ui="dashboard"] .kbd-hint { display: none; }
 
   .toast { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); max-width: 92vw; white-space: normal; text-align: center; }
 
-  /* Zen: floating bottom add-bar (chat-style, thumb reachable) */
-  html[data-ui="zen"] .add-row {
-    position: fixed;
-    left: 14px; right: 14px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px));
-    z-index: 60;
-    border-radius: 999px;
-    padding: 5px 15px 5px 7px;
-    box-shadow: var(--shadow), var(--glow);
+  /* Zen: header stays one line — no wrapping greeting, tight hero */
+  html[data-ui="zen"] h1,
+  html[data-ui="focus"] h1,
+  html[data-ui="dashboard"] h1 {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  html[data-ui="zen"] .main { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
+  .hero { gap: 10px; flex: 1; min-width: 0; }
+  .hero-text { min-width: 0; flex: 1; }
+  .top-right { flex-shrink: 0; gap: 8px; }
+  .notes-toggle { flex-shrink: 0; }
 
-  html[data-ui="zen"] .halo { width: 46px; height: 46px; }
+  .halo { width: 40px; height: 40px; }
+  .halo svg { width: 20px; height: 20px; }
 
-  html[data-ui="focus"] .main { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .topbar { gap: 8px; }
 
   .dash-strip { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
   .dash-cell { min-width: 50px; }

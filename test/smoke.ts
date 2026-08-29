@@ -51,7 +51,7 @@ const { chromium } = require('/Users/avi.alima/.nvm/versions/node/v20.10.0/lib/n
   // version
   const ver = await page.$eval('#appVersion', (el: any) => el.textContent);
   console.log('version:', ver);
-  if (ver !== 'v78') throw new Error('version mismatch: ' + ver);
+  if (ver !== 'v79') throw new Error('version mismatch: ' + ver);
 
   // interface: zen default, all four modes switch and persist
   const uiDefault = await page.evaluate(() => ({
