@@ -152,6 +152,23 @@ check('carryCandidates orders days newest first', () => {
   const res = L.carryCandidates(days, '2026-08-09');
   assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), ['b', 'a']);
 });
+check('carryCandidates offers only the newest copy of a carried chain', () => {
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-21': day({ tasks: [{ ...T('c1', 'the task'), carriedFrom: { day: '2026-08-19', id: 'orig' } }] }),
+    '2026-08-28': day({ tasks: [{ ...T('c2', 'the task'), carriedFrom: { day: '2026-08-21', id: 'c1' } }] })
+  };
+  const res = L.carryCandidates(days, '2026-08-29');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), ['c2']);
+});
+check('carryCandidates hides the whole chain once the newest copy is done', () => {
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-28': day({ tasks: [{ ...T('c2', 'the task'), done: true, carriedFrom: { day: '2026-08-19', id: 'orig' } }] })
+  };
+  const res = L.carryCandidates(days, '2026-08-29');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), []);
+});
 
 console.log('migrate');
 check('migrate normalizes legacy array days', () => {

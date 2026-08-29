@@ -90,8 +90,11 @@ check('stale beats pending push without contact', () => {
 check('desync flag wins over pending work', () => {
   assert.equal(S.statusState({ ...statusBase, desync: true, dirty: true, pushAt: 90000 }), 'desync');
 });
-check('long-unconfirmed push reports desync', () => {
-  assert.equal(S.statusState({ ...statusBase, pushAt: 96000 }), 'desync');
+check('long-unconfirmed push stays pending (waiting for confirmation is not desync)', () => {
+  assert.equal(S.statusState({ ...statusBase, pushAt: 96000 }), 'pending');
+});
+check('desync only via the explicit flag (echo reconcile escalation)', () => {
+  assert.equal(S.statusState({ ...statusBase, pushAt: 96000, desync: true }), 'desync');
 });
 check('active push remains pending before server confirmation', () => {
   assert.equal(S.statusState({ ...statusBase, pushAt: 99900 }), 'pending');

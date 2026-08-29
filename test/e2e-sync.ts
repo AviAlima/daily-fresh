@@ -145,6 +145,61 @@ async function longPress(page: any, selector: string) {
   const pillBack = await pill(ph);
   check('pill recovers to Live on reconnect', /Live/.test(pillBack), pillBack);
 
+  // ---- Undo of a carry must be sync-safe (echo cannot resurrect it) ----
+  await desk.page.evaluate(() => {
+    const Logic = (window as any).Logic;
+    const raw = JSON.parse(localStorage.getItem('daily-fresh-state-v2') || '{}');
+    const resetHour = raw.settings.resetHour || 0;
+    const today = Logic.currentDayKey(new Date(), resetHour);
+    const y = Logic.shiftKey(today, -1);
+    if (!raw.days[y]) raw.days[y] = { tasks: [], tombstones: [], note: '', focus: null, reflection: '', fieldTs: {}, orderTs: 0 };
+    raw.days[y].tasks.push({ id: 'cu1', text: 'Carry undo chore', done: false, estimate: 0, order: 0, carriedFrom: null, created: '2026-01-01T00:00:00.000Z', doneAt: null, ts: null });
+    localStorage.setItem('daily-fresh-state-v2', JSON.stringify(raw));
+  });
+  await desk.page.reload({ waitUntil: 'domcontentloaded' });
+  await sleep(2000);
+  await desk.page.click('#carryToggle');
+  await sleep(250);
+  await desk.page.click('#carryList [data-carry]');
+  await sleep(1500);
+  const phCarried = await openTasks(ph.page);
+  check('carried task reached the phone', phCarried.includes('Carry undo chore'), JSON.stringify(phCarried));
+  await desk.page.click('#toast .toast-act');
+  await sleep(500);
+  const deskAfterUndo = await openTasks(desk.page);
+  check('undo removed the carried task on desktop', !deskAfterUndo.includes('Carry undo chore'), JSON.stringify(deskAfterUndo));
+  await sleep(6000);
+  const deskLater = await openTasks(desk.page);
+  check('undo survives the sync echo on desktop', !deskLater.includes('Carry undo chore'), JSON.stringify(deskLater));
+  const phAfterUndo = await openTasks(ph.page);
+  check('undo propagated to the phone', !phAfterUndo.includes('Carry undo chore'), JSON.stringify(phAfterUndo));
+
+  // ---- Concurrent writes from both sides must never flash "Out of sync" ----
+  let desyncFlash = '';
+  const watchPill = async (d: Device) => {
+    const end = Date.now() + 8000;
+    while (Date.now() < end) {
+      const t = await pill(d).catch(() => '');
+      if (/Out of sync/.test(t)) return t;
+      await sleep(200);
+    }
+    return '';
+  };
+  const w1 = watchPill(desk);
+  const w2 = watchPill(ph);
+  await addTask(desk.page, 'Concurrent desk');
+  await addTask(ph.page, 'Concurrent phone');
+  await addTask(desk.page, 'Concurrent desk 2');
+  const flash1 = await w1;
+  const flash2 = await w2;
+  check('no "Out of sync" flash on the initiating device', !flash1, flash1);
+  check('no "Out of sync" flash on the receiving device', !flash2, flash2);
+  await sleep(4000);
+  const deskConc = await openTasks(desk.page);
+  const phConc = await openTasks(ph.page);
+  check('concurrent tasks converge on desktop', deskConc.includes('Concurrent desk') && deskConc.includes('Concurrent phone') && deskConc.includes('Concurrent desk 2'), JSON.stringify(deskConc));
+  check('concurrent tasks converge on phone', phConc.includes('Concurrent desk') && phConc.includes('Concurrent phone') && phConc.includes('Concurrent desk 2'), JSON.stringify(phConc));
+
   // ---- resetHour syncs across devices ----
   const nowHour = new Date().getHours();
   await desk.page.click('#navSettings');

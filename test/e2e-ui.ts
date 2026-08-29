@@ -137,13 +137,59 @@ async function cleanSeed(page: any) {
   await page.reload({ waitUntil: 'networkidle' });
   await sleep(400);
   const stackedBadge = await page.$eval('#navToday .carry-count', (el: any) => el ? el.textContent : null).catch(() => null);
-  check('origin and its copy both offered (2 candidates)', stackedBadge === '2', 'badge=' + stackedBadge);
+  check('only the newest copy of the chain is offered (1 candidate)', stackedBadge === '1', 'badge=' + stackedBadge);
   await page.click('#carryToggle');
   await sleep(250);
   await page.click('#carryAll');
   await sleep(400);
   const stackedCount = await page.$$eval('#taskList .task', (els: any[]) => els.filter((e: any) => e.querySelector('.task-text').textContent === 'Stacked task').length);
-  check('bring-all of origin+copy creates exactly one task', stackedCount === 1, 'count=' + stackedCount);
+  check('bring-all of a chain creates exactly one task', stackedCount === 1, 'count=' + stackedCount);
+
+  // ---- Postpone then Undo: the copy must not survive in tomorrow ----
+  await page.evaluate(() => {
+    const Logic = (window as any).Logic;
+    const resetHour = 5;
+    const today = Logic.currentDayKey(new Date(), resetHour);
+    const y = Logic.shiftKey(today, -1);
+    const mkDay = (tasks: any[]) => ({ tasks, note: '', focus: null, reflection: '', tombstones: [], fieldTs: {}, orderTs: 0 });
+    const task = { id: 'pt1', text: 'Postponed chore', done: false, estimate: 0, order: 0, carriedFrom: null, created: '2026-01-01T00:00:00.000Z', doneAt: null, ts: null };
+    const state = { settings: { resetHour, theme: 'dark', sound: false, name: 'E2E' }, days: { [y]: mkDay([task]), [today]: mkDay([]) }, onboarded: true, activeDay: today };
+    localStorage.setItem('daily-fresh-state-v2', JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await sleep(400);
+  await page.click('#carryToggle');
+  await sleep(250);
+  await page.click('#carryList [data-carry]');
+  await sleep(300);
+  await page.click('#taskList .task:has-text("Postponed chore") [data-edit]');
+  await sleep(200);
+  await page.click('#editPostponeBtn');
+  await sleep(200);
+  await page.click('#editPostponeRow [data-postpone="tomorrow"]');
+  await sleep(400);
+  const postponedGone = await openTasks(page);
+  check('postpone moved the task out of today', !postponedGone.includes('Postponed chore'), JSON.stringify(postponedGone));
+  await page.click('#toast .toast-act');
+  await sleep(400);
+  const undoneBack = await openTasks(page);
+  check('undo brings the postponed task back to today', undoneBack.includes('Postponed chore'), JSON.stringify(undoneBack));
+  const copyStranded = await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('daily-fresh-state-v2') || '{}');
+    const Logic = (window as any).Logic;
+    const tomorrow = Logic.shiftKey(Logic.currentDayKey(new Date(), 5), 1);
+    const d = s.days && s.days[tomorrow];
+    return d ? (d.tasks || []).filter((t: any) => t.text === 'Postponed chore').length : 0;
+  });
+  check('undo removes the stranded copy from tomorrow', copyStranded === 0, 'copies=' + copyStranded);
+  const copyTombstoned = await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('daily-fresh-state-v2') || '{}');
+    const Logic = (window as any).Logic;
+    const tomorrow = Logic.shiftKey(Logic.currentDayKey(new Date(), 5), 1);
+    const d = s.days && s.days[tomorrow];
+    return d ? (d.tombstones || []).length : 0;
+  });
+  check('the undone copy is tombstoned (sync cannot resurrect it)', copyTombstoned >= 1, 'tombstones=' + copyTombstoned);
 
   console.log('errors:', errors.length ? errors : 'none');
   if (errors.length) { fail++; console.log('  FAIL page errors: ' + errors.join(' | ')); }

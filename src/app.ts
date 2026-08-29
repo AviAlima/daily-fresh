@@ -5,7 +5,7 @@
   var OLD_KEY = 'daily-fresh-state';
   var BACKUP_KEYS = ['daily-fresh-state-b1', 'daily-fresh-state-b2', 'daily-fresh-state-b3'];
   var CORRUPT_KEY = 'daily-fresh-state-corrupt';
-  var APP_VERSION = 'v73';
+  var APP_VERSION = 'v75';
 
   var state: AppState = load();
   var activeDay = state.activeDay || currentDayKey();
@@ -320,28 +320,44 @@
 
   /* ================= Undo ================= */
 
-  var undoSnapshot: { dayKey: string; tasks: string; tombstones: string } | null = null;
+  var undoSnapshot: string | null = null;
 
   function pushUndo() {
-    undoSnapshot = {
-      dayKey: activeDay,
-      tasks: JSON.stringify(today().tasks),
-      tombstones: JSON.stringify(today().tombstones || [])
-    };
+    try { undoSnapshot = JSON.stringify(state.days); } catch (e) { undoSnapshot = null; }
   }
 
   function doUndo() {
     if (!undoSnapshot) return;
-    var snap = undoSnapshot;
+    var before: Record<string, DayShape>;
+    try { before = JSON.parse(undoSnapshot); } catch (e) { undoSnapshot = null; return; }
     undoSnapshot = null;
-    if (!state.days[snap.dayKey]) state.days[snap.dayKey] = newDayObj();
-    state.days[snap.dayKey].tasks = JSON.parse(snap.tasks);
-    state.days[snap.dayKey].tombstones = JSON.parse(snap.tombstones || '[]');
-    var restoredNow = Date.now();
-    state.days[snap.dayKey].tasks.forEach(function (t) {
-      if (!t.ts) t.ts = {};
-      t.ts.text = restoredNow;
+    var now = Date.now();
+    // Tasks that exist now but not in the snapshot were added after it.
+    // Tombstone them so the sync echo (or another device) cannot resurrect
+    // what the user just undid.
+    Object.keys(state.days).forEach(function (k) {
+      var b = before[k];
+      var bIds: Record<string, boolean> = {};
+      ((b && b.tasks) || []).forEach(function (t) { if (t && t.id) bIds[t.id] = true; });
+      (state.days[k].tasks || []).forEach(function (t) {
+        if (!t || !t.id || bIds[t.id]) return;
+        if (!b) { b = before[k] = { tasks: [], tombstones: [], note: '', focus: null, reflection: '', fieldTs: {}, orderTs: 0 }; }
+        if (!Array.isArray(b.tombstones)) b.tombstones = [];
+        if (!b.tombstones.some(function (x: any) { return x && x.id === t.id; })) {
+          b.tombstones.push({ id: t.id, deletedAt: now });
+        }
+      });
     });
+    // Restored tasks must outrank any tombstone a delete may have pushed
+    // to the cloud in the meantime.
+    Object.keys(before).forEach(function (k) {
+      ((before[k] && before[k].tasks) || []).forEach(function (t) {
+        if (!t) return;
+        if (!t.ts) t.ts = {};
+        t.ts.text = now;
+      });
+    });
+    state.days = before;
     save();
     render();
     toast('Restored');

@@ -57,9 +57,13 @@ let syncDesync = false;
 const STALE_MS = 60000;
 const HEARTBEAT_MS = 30000;
 const OUT_OF_SYNC_MS = 8000;
-const DESYNC_SHOW_MS = 3000;
 let lastContact = 0;
 let pendingSyncWrites = false;
+// Consecutive times the server state differed from our pushed state during
+// confirmation. Another device writing meanwhile is NORMAL convergence — we
+// reconcile (merge + re-push) instead of declaring desync. Only persistent
+// mismatch escalates to a real desync.
+let echoMisses = 0;
 
 type SyncStatusState = 'off' | 'synced' | 'pending' | 'error' | 'stale' | 'desync';
 
@@ -81,7 +85,7 @@ function statusState(input: {
   if (online === false) return 'stale';
   const fresh = contact > 0 && now - contact <= STALE_MS;
   if (!fresh) return 'stale';
-  if (desync || (pushAt > 0 && now - pushAt > DESYNC_SHOW_MS)) return 'desync';
+  if (desync) return 'desync';
   if (dirty || pending || pushAt > 0) return 'pending';
   return 'synced';
 }
@@ -739,6 +743,7 @@ function retryFlush(): void {
 function markDesync(reason: string): void {
   syncDesync = true;
   dirty = true;
+  echoMisses = 0;
   pushInFlight = null;
   if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
   logEvent('desync', reason);
@@ -760,13 +765,21 @@ function confirmPush(): void {
       pushInFlight = null;
       pendingSyncWrites = false;
       syncDesync = false;
+      echoMisses = 0;
       logEvent('confirm-read', 'ok');
       notifyStatus();
     } else {
       remoteOpenDays = cur;
-      logEvent('confirm-read', 'diff');
+      echoMisses++;
+      logEvent('confirm-read', 'diff (' + echoMisses + ')');
       applyRemote();
-      markDesync('server state differs from the pushed state');
+      if (echoMisses >= 3) {
+        markDesync('server state differs from the pushed state after ' + echoMisses + ' reconciliations');
+      } else {
+        dirty = true;
+        retryFlush();
+        notifyStatus();
+      }
     }
   }).catch((e: any) => {
     logEvent('confirm-read', (e && e.message) ? e.message : String(e));
@@ -812,11 +825,20 @@ function startListeners(): void {
         pushInFlight = null;
         pendingSyncWrites = false;
         syncDesync = false;
+        echoMisses = 0;
         if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
       } else {
-        logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays));
         if (Date.now() - pushInFlight.at > OUT_OF_SYNC_MS) {
-          markDesync('server echo differs from the pushed state');
+          echoMisses++;
+          logEvent('echo-diff', pushDiff(pushInFlight.days, remoteOpenDays) + ' (' + echoMisses + ')');
+          if (echoMisses >= 3) {
+            markDesync('server echo differs from the pushed state');
+          } else {
+            applyRemote();
+            dirty = true;
+            retryFlush();
+            notifyStatus();
+          }
         }
       }
     }

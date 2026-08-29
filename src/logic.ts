@@ -181,17 +181,29 @@
       const r = rootOf(t, days, activeDay);
       if (r) carried[r] = true;
     });
-    const keys = Object.keys(days)
+    const past = Object.keys(days)
       .filter(function (k) { return k < activeDay; })
-      .sort()
-      .reverse();
-    const res: { day: string; task: TaskShape }[] = [];
-    keys.forEach(function (k) {
+      .sort();
+    // Latest instance per root (done or not): an older copy whose task was
+    // carried forward is stale, and a chain whose newest copy is already
+    // done is closed. Only a newest unfinished copy may be carried again.
+    const latest: Record<string, { day: string; id: string; done: boolean }> = {};
+    past.forEach(function (k) {
       (days[k].tasks || []).forEach(function (t) {
-        if (!t.done) {
-          const r = rootOf(t, days, k);
-          if (!r || !carried[r]) res.push({ day: k, task: t });
-        }
+        if (!t) return;
+        const r = rootOf(t, days, k);
+        if (!r) return;
+        latest[r] = { day: k, id: t.id, done: !!t.done };
+      });
+    });
+    const res: { day: string; task: TaskShape }[] = [];
+    past.slice().reverse().forEach(function (k) {
+      (days[k].tasks || []).forEach(function (t) {
+        if (!t || t.done) return;
+        const r = rootOf(t, days, k);
+        if (!r || carried[r]) return;
+        const top = latest[r];
+        if (top && top.day === k && top.id === t.id && !top.done) res.push({ day: k, task: t });
       });
     });
     return res;
