@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -19,6 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Auto-bump version
+        run: |
+          if git log -1 --format=%s | grep -q '^chore(release):'; then
+            echo "HEAD is already a release commit, skipping bump"
+            exit 0
+          fi
+          NEXT=$(( $(grep -ohE 'v[0-9]+' src/app.ts src/sw.ts | tr -d 'v' | sort -n | tail -1) + 1 ))
+          sed -i "s/APP_VERSION = 'v[0-9]*'/APP_VERSION = 'v$NEXT'/" src/app.ts
+          sed -i "s/const CACHE = 'daily-fresh-v[0-9]*'/const CACHE = 'daily-fresh-v$NEXT'/" src/sw.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app.ts src/sw.ts
+          git commit -m "chore(release): v$NEXT [skip ci]"
+          git push
+          echo "Bumped to v$NEXT"
 
       - name: Type-check and unit tests
         run: |
