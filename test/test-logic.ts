@@ -295,15 +295,20 @@ check('migrate keeps completed same-text tasks', () => {
 });
 check('migrate preserves settings and ts fields', () => {
   const s = L.migrate({
-    settings: { resetHour: 5, theme: 'light', sound: false, name: 'Avi' },
+    settings: { resetHour: 5, theme: 'light', sound: false, name: 'Avi', allowReset: true },
     tomorrowTs: 111, nameTs: 222, resetHourTs: 333,
     days: { '2026-08-10': day({ note: 'n' }) }
   });
-  assert.deepEqual(s.settings, { resetHour: 5, theme: 'light', sound: false, name: 'Avi' });
+  assert.deepEqual(s.settings, { resetHour: 5, theme: 'light', sound: false, name: 'Avi', allowReset: true });
   assert.equal(s.tomorrowTs, 111);
   assert.equal(s.nameTs, 222);
   assert.equal(s.resetHourTs, 333);
   assert.equal(s.days['2026-08-10'].note, 'n');
+});
+check('migrate defaults allowReset to false when missing or non-boolean', () => {
+  assert.equal(L.migrate({ settings: { resetHour: 5 } }).settings.allowReset, false);
+  assert.equal(L.migrate({ settings: { allowReset: 'yes' } }).settings.allowReset, false);
+  assert.equal(L.migrate({}).settings.allowReset, false);
 });
 check('migrate ignores corrupt days and keeps others', () => {
   const s = L.migrate({ days: { bad: null, '2026-08-10': day({ note: 'good' }) } });

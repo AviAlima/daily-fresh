@@ -1492,6 +1492,16 @@ select:focus { border-color: rgba(129, 140, 248, 0.55); box-shadow: 0 0 0 3px rg
 .pin-hold.holding .hold-btn { box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.16), 0 4px 16px rgba(248, 113, 113, 0.3); }
 .pin-hint { font-size: 12.5px; min-height: 17px; }
 
+.msr { width: 62px; height: 36px; }
+.msr-track { border-radius: 18px; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25); }
+.msr-thumb { width: 28px; height: 28px; top: 3px; left: 3px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.msr.armed .msr-thumb {
+  transform: translateX(26px);
+  background: linear-gradient(135deg, #fb8a8a, var(--red));
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+}
+.msr-cover { border-radius: 18px; backdrop-filter: blur(2px); }
+
 .focus-title { font-size: 13px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
 
 .focus-task-name {

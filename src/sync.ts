@@ -371,13 +371,13 @@ function mergeMeta(state: AppState, rm: RemoteMeta): { tomorrow: { id: string; t
     changed = true;
   }
   if ((rm.nameTs || 0) > (state.nameTs || 0) && typeof rm.name === 'string') {
-    state.settings = state.settings || { resetHour: 0, theme: 'dark', sound: true, name: '' };
+    state.settings = state.settings || { resetHour: 0, theme: 'dark', sound: true, name: '', allowReset: false };
     state.settings.name = rm.name;
     state.nameTs = rm.nameTs;
     changed = true;
   }
   if ((rm.resetHourTs || 0) > (state.resetHourTs || 0) && typeof rm.resetHour === 'number') {
-    state.settings = state.settings || { resetHour: 0, theme: 'dark', sound: true, name: '' };
+    state.settings = state.settings || { resetHour: 0, theme: 'dark', sound: true, name: '', allowReset: false };
     state.settings.resetHour = rm.resetHour;
     state.resetHourTs = rm.resetHourTs;
     changed = true;
@@ -539,7 +539,7 @@ function applyRemote(): void {
   const state = readLocal();
   if (!state) return;
   if (!state.days) state.days = {};
-  if (!state.settings) state.settings = { resetHour: 0, theme: 'dark', sound: true, name: '' };
+  if (!state.settings) state.settings = { resetHour: 0, theme: 'dark', sound: true, name: '', allowReset: false };
   let changed = false;
   let normalized = false;
 
