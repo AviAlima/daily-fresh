@@ -22,6 +22,8 @@ interface TaskShape {
 interface Tombstone {
   id: string;
   deletedAt: number;
+  /** carriedFrom of the removed task, kept so carriedFrom chains survive postpone/delete */
+  cf?: CarriedFrom | null;
 }
 
 interface DayShape {

@@ -227,6 +227,14 @@ check('tombstone union takes max deletedAt', () => {
   const m = S.mergeTombstones(a, b);
   assert.deepEqual(m, [{ id: 'x', deletedAt: 500 }, { id: 'y', deletedAt: 100 }]);
 });
+check('tombstone union preserves the chain link (cf)', () => {
+  const a: Tombstone[] = [{ id: 'x', deletedAt: 100 }];
+  const b: Tombstone[] = [{ id: 'x', deletedAt: 500, cf: { day: '2026-08-07', id: 'o' } }];
+  const m = S.mergeTombstones(a, b);
+  assert.deepEqual(m, [{ id: 'x', deletedAt: 500, cf: { day: '2026-08-07', id: 'o' } }]);
+  const m2 = S.mergeTombstones(b, a);
+  assert.deepEqual(m2, [{ id: 'x', deletedAt: 500, cf: { day: '2026-08-07', id: 'o' } }], 'older link-free tombstone must not drop the link');
+});
 check('carried task duplicate not merged twice', () => {
   const mk = (id: string) => Object.assign(T(id, 'task'), { carriedFrom: { day: '2026-08-06', id: 'orig' } });
   const local = day({ tasks: [mk('new1')], fieldTs: {} });

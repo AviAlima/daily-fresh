@@ -182,7 +182,8 @@
     pushUndo();
     if (day.focus === id) day.focus = null;
     if (!day.tombstones) day.tombstones = [];
-    day.tombstones.push({ id: id, deletedAt: Date.now() });
+    var removed = day.tasks[idx];
+    day.tombstones.push({ id: id, deletedAt: Date.now(), cf: removed && removed.carriedFrom ? { day: removed.carriedFrom.day, id: removed.carriedFrom.id } : null });
     day.tasks.splice(idx, 1);
     save();
     render();
@@ -209,15 +210,28 @@
     render();
   }
 
+  // Close the logical origin of a completed carried task. The immediate
+  // parent may itself be gone (postponed/deleted), so walk up through
+  // tombstone links until a surviving ancestor is found.
   function closeOrigin(cf: { day: string; id: string }) {
-    var originDay = state.days[cf.day];
-    if (!originDay) return;
-    var origin = originDay.tasks.find(function (t) { return t.id === cf.id; });
-    if (!origin) return;
-    origin.done = true;
-    origin.doneAt = Date.now();
-    if (!origin.ts) origin.ts = {};
-    origin.ts.done = Date.now();
+    var d = cf.day;
+    var id = cf.id;
+    for (var hops = 0; hops < 12 && d && id; hops++) {
+      var originDay = state.days[d];
+      var origin = originDay && originDay.tasks.find(function (t) { return t.id === id; });
+      if (!origin) {
+        var tcf = Logic.tombCf(state.days, d, id);
+        if (!tcf) return;
+        d = tcf.day;
+        id = tcf.id;
+        continue;
+      }
+      origin.done = true;
+      origin.doneAt = Date.now();
+      if (!origin.ts) origin.ts = {};
+      origin.ts.done = Date.now();
+      return;
+    }
   }
 
   function editTask(id: string, text: string) {
@@ -303,7 +317,7 @@
     pushUndo();
     if (day.focus === id) day.focus = null;
     if (!day.tombstones) day.tombstones = [];
-    day.tombstones.push({ id: id, deletedAt: Date.now() });
+    day.tombstones.push({ id: id, deletedAt: Date.now(), cf: task.carriedFrom ? { day: task.carriedFrom.day, id: task.carriedFrom.id } : null });
     day.tasks.splice(idx, 1);
     var td = dayObj(targetKey);
     var t: TaskShape = {

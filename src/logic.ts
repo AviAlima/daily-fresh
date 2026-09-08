@@ -134,13 +134,28 @@
     return 'Good evening' + suffix;
   }
 
+  function tombCf(days: Record<string, DayShape>, day: string, id: string): CarriedFrom | null {
+    const pd = days[day];
+    const tbs = pd && pd.tombstones;
+    if (!tbs) return null;
+    const tb = tbs.find(function (x) { return x && x.id === id; });
+    return (tb && tb.cf) ? { day: tb.cf.day, id: tb.cf.id } : null;
+  }
+
   function rootOf(t: TaskShape, days: Record<string, DayShape>, dayKey: string): string {
     let d = t.carriedFrom && t.carriedFrom.day;
     let id = t.carriedFrom && t.carriedFrom.id;
     for (let hops = 0; hops < 12 && d && id; hops++) {
       const pd = days[d];
       const parent = pd && (pd.tasks || []).find(function (x) { return x && x.id === id; });
-      if (!parent || !parent.carriedFrom) {
+      if (!parent) {
+        // The parent task was postponed/deleted; its tombstone keeps the
+        // chain alive so the copy still resolves to the same root.
+        const cf = tombCf(days, d, id);
+        if (cf) { d = cf.day; id = cf.id; continue; }
+        return d + ':' + id;
+      }
+      if (!parent.carriedFrom) {
         return d + ':' + id;
       }
       d = parent.carriedFrom.day;
@@ -290,6 +305,7 @@
     streak,
     greeting,
     rootOf,
+    tombCf,
     dedupeDay,
     carryCandidates,
     migrate

@@ -1911,7 +1911,7 @@ body.notes-open html[data-ui="focus"] .reflection-card { display: block; }
 
 html[data-ui="focus"] .notes-toggle { display: flex; }
 
-html[data-ui="focus"] .carry-list { max-height: 0; overflow: hidden; }
+html[data-ui="focus"] .carry-header:not(.open) + .carry-list { max-height: 0; overflow: hidden; }
 
 html[data-ui="focus"] .focus-card {
   padding: 20px 18px;

@@ -128,6 +128,39 @@ check('rootOf walks dangling chains to the first link', () => {
   const t = { ...T('c', 'orphaned'), carriedFrom: { day: '2026-08-08', id: 'gone' } };
   assert.equal(L.rootOf(t, days, '2026-08-09'), '2026-08-08:gone');
 });
+check('rootOf hops through a postponed (tombstoned) parent via its cf link', () => {
+  const days = {
+    '2026-08-07': day({ tasks: [T('o', 'origin')] }),
+    '2026-08-08': day({
+      tasks: [],
+      tombstones: [{ id: 'c1', deletedAt: 1000, cf: { day: '2026-08-07', id: 'o' } }]
+    }),
+    '2026-08-09': day({ tasks: [{ ...T('c2', 'deferred'), carriedFrom: { day: '2026-08-08', id: 'c1' } }] })
+  };
+  assert.equal(L.rootOf(days['2026-08-09'].tasks[0], days, '2026-08-09'), '2026-08-07:o');
+});
+check('rootOf hops through multiple postponed links (deferred twice)', () => {
+  const days = {
+    '2026-08-07': day({ tasks: [T('o', 'origin')] }),
+    '2026-08-08': day({
+      tasks: [],
+      tombstones: [{ id: 'c1', deletedAt: 1000, cf: { day: '2026-08-07', id: 'o' } }]
+    }),
+    '2026-08-09': day({
+      tasks: [],
+      tombstones: [{ id: 'c2', deletedAt: 2000, cf: { day: '2026-08-08', id: 'c1' } }]
+    }),
+    '2026-08-10': day({ tasks: [{ ...T('c3', 'deferred twice'), carriedFrom: { day: '2026-08-09', id: 'c2' } }] })
+  };
+  assert.equal(L.rootOf(days['2026-08-10'].tasks[0], days, '2026-08-10'), '2026-08-07:o');
+});
+check('rootOf still stops at tombstones without a cf link (legacy data)', () => {
+  const days = {
+    '2026-08-08': day({ tasks: [], tombstones: [{ id: 'gone', deletedAt: 1000 }] }),
+    '2026-08-09': day({ tasks: [{ ...T('c', 'orphaned'), carriedFrom: { day: '2026-08-08', id: 'gone' } }] })
+  };
+  assert.equal(L.rootOf(days['2026-08-09'].tasks[0], days, '2026-08-09'), '2026-08-08:gone');
+});
 
 console.log('carry candidates');
 check('carryCandidates excludes already-carried and done tasks', () => {
@@ -181,6 +214,44 @@ check('carryCandidates hides candidates whose text is already open in today (ded
   (days2['2026-08-29'].tasks[0] as any).done = true;
   const res2 = L.carryCandidates(days2, '2026-08-29');
   assert.deepEqual(res2.map((r: { task: TaskShape }) => r.task.id), ['c1'], 'done same-text must not hide the candidate');
+});
+check('carryCandidates hides the original after its carried copy was deferred (chain survives postpone)', () => {
+  // orig on the 19th, carried to the 28th, then that copy was postponed to
+  // the 29th: the 28th link is gone but its tombstone keeps the chain alive,
+  // so the deferred copy still claims orig's root and hides it.
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-28': day({
+      tasks: [],
+      tombstones: [{ id: 'c1', deletedAt: 1000, cf: { day: '2026-08-19', id: 'orig' } }]
+    }),
+    '2026-08-29': day({ tasks: [{ ...T('c2', 'the task'), carriedFrom: { day: '2026-08-28', id: 'c1' } }] })
+  };
+  const res = L.carryCandidates(days, '2026-08-29');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), []);
+});
+check('carryCandidates keeps the original hidden after the deferred copy is done (no resurface)', () => {
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-28': day({
+      tasks: [],
+      tombstones: [{ id: 'c1', deletedAt: 1000, cf: { day: '2026-08-19', id: 'orig' } }]
+    }),
+    '2026-08-29': day({ tasks: [{ ...T('c2', 'the task'), done: true, carriedFrom: { day: '2026-08-28', id: 'c1' } }] })
+  };
+  const res = L.carryCandidates(days, '2026-08-30');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), [], 'stale original must not resurface after the deferred copy was completed');
+});
+check('carryCandidates offers the original when the postponing chain is legacy-broken', () => {
+  // A tombstone without cf cannot keep the chain alive: the copy claims a
+  // different root, so the original is offered again (pre-fix behaviour).
+  const days = {
+    '2026-08-19': day({ tasks: [T('orig', 'the task')] }),
+    '2026-08-28': day({ tasks: [], tombstones: [{ id: 'c1', deletedAt: 1000 }] }),
+    '2026-08-29': day({ tasks: [{ ...T('c2', 'different text'), carriedFrom: { day: '2026-08-28', id: 'c1' } }] })
+  };
+  const res = L.carryCandidates(days, '2026-08-29');
+  assert.deepEqual(res.map((r: { task: TaskShape }) => r.task.id), ['orig']);
 });
 
 console.log('migrate');

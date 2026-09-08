@@ -227,15 +227,37 @@ function tombstoneOf(list: Tombstone[], id: string): Tombstone | null {
   return null;
 }
 
+function cloneCf(cf: CarriedFrom | null | undefined): CarriedFrom | null {
+  return cf ? { day: cf.day, id: cf.id } : null;
+}
+
+function tombOut(id: string, deletedAt: number, cf: CarriedFrom | null): Tombstone {
+  // Keep the legacy shape when there is no chain link so existing payloads
+  // and tests stay byte-identical.
+  return cf ? { id, deletedAt, cf } : { id, deletedAt };
+}
+
 function mergeTombstones(a: Tombstone[] | undefined, b: Tombstone[] | undefined): Tombstone[] {
-  const byId: Record<string, number> = {};
-  (a || []).forEach((t) => { byId[t.id] = t.deletedAt; });
+  const byId: Record<string, Tombstone> = {};
+  (a || []).forEach((t) => {
+    if (!t || !t.id) return;
+    byId[t.id] = tombOut(t.id, t.deletedAt, cloneCf(t.cf));
+  });
   (b || []).forEach((t) => {
-    if (t.id in byId) byId[t.id] = Math.max(byId[t.id], t.deletedAt);
-    else byId[t.id] = t.deletedAt;
+    if (!t || !t.id) return;
+    const cur = byId[t.id];
+    if (!cur) {
+      byId[t.id] = tombOut(t.id, t.deletedAt, cloneCf(t.cf));
+      return;
+    }
+    // Newest deletion wins; on a tie prefer the entry that keeps the chain link.
+    if (t.deletedAt > cur.deletedAt || (t.deletedAt === cur.deletedAt && t.cf && !cur.cf)) {
+      cur.deletedAt = t.deletedAt;
+      byId[t.id] = tombOut(t.id, t.deletedAt, cloneCf(t.cf));
+    }
   });
   const out: Tombstone[] = [];
-  Object.keys(byId).forEach((id) => { out.push({ id, deletedAt: byId[id] }); });
+  Object.keys(byId).forEach((id) => { out.push(byId[id]); });
   out.sort((a, b) => { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
   return out;
 }

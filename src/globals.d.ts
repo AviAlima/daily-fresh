@@ -68,6 +68,7 @@ interface LogicApi {
   streak(days: Record<string, DayShape>, activeDay: string): number;
   greeting(now: Date, name: string): string;
   rootOf(t: TaskShape, days: Record<string, DayShape>, dayKey: string): string;
+  tombCf(days: Record<string, DayShape>, day: string, id: string): CarriedFrom | null;
   dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>, fallbackKey?: string): { tasks: TaskShape[]; dropped: boolean; droppedIds: string[] };
   carryCandidates(days: Record<string, DayShape>, activeDay: string): { day: string; task: TaskShape }[];
   migrate(p: unknown): AppState;
