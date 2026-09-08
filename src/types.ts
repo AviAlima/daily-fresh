@@ -41,7 +41,6 @@ interface SettingsShape {
   theme: string;
   sound: boolean;
   name: string;
-  allowReset: boolean;
 }
 
 interface AppState {

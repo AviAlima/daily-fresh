@@ -237,7 +237,7 @@
 
   function migrate(p: any): AppState {
     const s: AppState = {
-      settings: { resetHour: 0, theme: 'dark', sound: true, name: '', allowReset: false },
+      settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
       onboarded: true
     };
@@ -245,7 +245,6 @@
       if (typeof p.settings.resetHour === 'number') s.settings.resetHour = p.settings.resetHour;
       if (typeof p.settings.theme === 'string') s.settings.theme = p.settings.theme;
       if (typeof p.settings.sound === 'boolean') s.settings.sound = p.settings.sound;
-      if (typeof p.settings.allowReset === 'boolean') s.settings.allowReset = p.settings.allowReset;
       if (p.settings.name) s.settings.name = p.settings.name;
     }
     Object.keys(p.days || {}).forEach(function (k) {

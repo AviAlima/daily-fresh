@@ -23,7 +23,7 @@ const day = (o: Partial<DayShape>): DayShape => ({
 
 const st = (o: Partial<Omit<AppState, 'settings'>> & { settings?: Partial<SettingsShape> }): AppState => {
   const base: AppState = {
-    settings: { resetHour: 0, theme: 'dark', sound: false, name: '', allowReset: false },
+    settings: { resetHour: 0, theme: 'dark', sound: false, name: '' },
     days: {}, tomorrow: [], onboarded: true
   };
   return Object.assign(base, o, { settings: Object.assign(base.settings, o.settings || {}) });

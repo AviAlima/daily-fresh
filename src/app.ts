@@ -62,7 +62,7 @@
 
   function freshState(): AppState {
     return {
-      settings: { resetHour: 0, theme: 'dark', sound: true, name: '', allowReset: false },
+      settings: { resetHour: 0, theme: 'dark', sound: true, name: '' },
       days: {},
       onboarded: false
     };
@@ -438,12 +438,6 @@
     resetHour: $<HTMLSelectElement>('resetHour'),
     themeSelect: $<HTMLSelectElement>('themeSelect'),
     soundToggle: $<HTMLInputElement>('soundToggle'),
-    allowResetMsr: $('allowResetMsr'),
-    allowResetSwitch: $<HTMLButtonElement>('allowResetSwitch'),
-    allowResetCover: $<HTMLButtonElement>('allowResetCover'),
-    allowResetSub: $('allowResetSub'),
-    dataSub: $('dataSub'),
-    resetDataBtn: $<HTMLButtonElement>('resetDataBtn'),
     nameInput: $<HTMLInputElement>('nameInput'),
     uiZenBtn: $<HTMLButtonElement>('uiZenBtn'),
     uiFocusBtn: $<HTMLButtonElement>('uiFocusBtn'),
@@ -944,37 +938,7 @@
     els.themeSelect.value = state.settings.theme || 'dark';
     els.soundToggle.checked = !!state.settings.sound;
     els.nameInput.value = state.settings.name || '';
-    applyAllowReset();
   }
-
-  var coverOpen = false;
-
-  function applyAllowReset() {
-    var armed = !!state.settings.allowReset;
-    els.allowResetMsr.classList.toggle('armed', armed);
-    els.allowResetMsr.classList.toggle('open', coverOpen || armed);
-    els.allowResetCover.disabled = coverOpen || armed;
-    els.allowResetSwitch.disabled = !(coverOpen || armed);
-    els.allowResetSwitch.setAttribute('aria-checked', armed ? 'true' : 'false');
-    els.allowResetSub.textContent = armed
-      ? 'Armed \u2014 Erase everything is unlocked'
-      : (coverOpen ? 'Flip the switch to allow reset' : 'Lift the safety cover to arm');
-    els.dataSub.textContent = armed ? 'Erase all tasks, notes and history' : 'Turn on Allow reset to erase';
-    els.resetDataBtn.disabled = !armed;
-  }
-
-  els.allowResetCover.addEventListener('click', function () {
-    coverOpen = true;
-    applyAllowReset();
-    els.allowResetSwitch.focus();
-  });
-
-  els.allowResetSwitch.addEventListener('click', function () {
-    state.settings.allowReset = !state.settings.allowReset;
-    if (!state.settings.allowReset) coverOpen = false;
-    save();
-    applyAllowReset();
-  });
 
   function renderNavBadges() {
     var candidates = carryCandidates().length;
@@ -1448,15 +1412,12 @@
       days: {},
       onboarded: true
     };
-    state.settings.allowReset = false;
-    coverOpen = false;
-    applyAllowReset();
     activeDay = currentDayKey();
     state.activeDay = activeDay;
     state.days[activeDay] = newDayObj();
     save();
     render();
-    toast('Everything erased \u2014 a fresh start');
+    toast('Everything erased — a fresh start');
   }
 
   function openEraseModal() {
@@ -1585,13 +1546,7 @@
     }, 300);
   }
 
-  $('resetDataBtn').addEventListener('click', function () {
-    if (!state.settings.allowReset) {
-      toast('Turn on Allow reset in Settings first');
-      return;
-    }
-    openEraseModal();
-  });
+  $('resetDataBtn').addEventListener('click', openEraseModal);
   $('eraseCancel').addEventListener('click', closeEraseModal);
   $('eraseClose').addEventListener('click', closeEraseModal);
   $('eraseModal').addEventListener('click', function (e) {
