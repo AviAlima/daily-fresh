@@ -1421,17 +1421,129 @@
   }
 
   function openEraseModal() {
-    var modal = $('eraseModal');
-    modal.classList.remove('hidden');
-    var input = $('eraseInput') as HTMLInputElement;
-    input.value = '';
-    $('eraseGo')!.classList.remove('enabled');
-    ($('eraseGo') as HTMLButtonElement).disabled = true;
-    setTimeout(function () { input.focus(); }, 150);
+    $('eraseModal').classList.remove('hidden');
+    resetPinHold();
   }
 
   function closeEraseModal() {
     $('eraseModal').classList.add('hidden');
+    resetPinHold();
+  }
+
+  var HOLD_MS = 3000;
+  var RING_CIRC = 119.4;
+  var pinHoldEl = $('pinHold');
+  var pinEl = $('erasePin');
+  var holdBtn = $('eraseGo') as HTMLButtonElement;
+  var holdLabel = $('eraseGoLabel');
+  var ringFill = $('holdRingFill') as unknown as SVGCircleElement;
+  var appEl = document.querySelector('.app') as HTMLElement;
+  var hintEl = $('pinHint');
+  var pinPulled = false;
+  var holding = false;
+  var holdRaf = 0;
+  var shakeTimer = 0;
+  var dragPid = -1;
+  var dragStartX = 0;
+  var dragX = 0;
+
+  function setAppSaturate(v: number) {
+    appEl.style.filter = v >= 0.999 ? '' : 'saturate(' + v.toFixed(3) + ')';
+  }
+
+  function pinMaxX() {
+    return holdBtn.offsetWidth - pinEl.offsetWidth - 20;
+  }
+
+  function resetPinHold() {
+    pinPulled = false;
+    holding = false;
+    if (holdRaf) cancelAnimationFrame(holdRaf);
+    if (shakeTimer) clearTimeout(shakeTimer);
+    holdRaf = 0;
+    dragPid = -1;
+    pinHoldEl.classList.remove('armed', 'pulled', 'holding', 'shake', 'dragging');
+    pinEl.style.setProperty('--pin-x', '0px');
+    holdBtn.disabled = true;
+    ringFill.style.strokeDashoffset = String(RING_CIRC);
+    holdLabel.textContent = 'Pull the pin first';
+    hintEl.textContent = 'Drag the safety pin out of the button to arm it';
+    setAppSaturate(1);
+  }
+
+  function armPin() {
+    pinPulled = true;
+    pinEl.style.setProperty('--pin-x', pinMaxX() + 'px');
+    pinHoldEl.classList.add('pulled', 'armed');
+    holdBtn.disabled = false;
+    holdLabel.textContent = 'Hold 3 seconds to erase';
+    hintEl.textContent = 'Armed \u2014 hold the button down to erase';
+  }
+
+  function disarmPin(shake: boolean) {
+    pinPulled = false;
+    pinHoldEl.classList.remove('armed', 'pulled');
+    pinEl.style.setProperty('--pin-x', '0px');
+    holdBtn.disabled = true;
+    holdLabel.textContent = 'Pull the pin first';
+    if (shake) {
+      hintEl.textContent = 'Released too early \u2014 pull the pin again';
+      pinHoldEl.classList.remove('shake');
+      void pinHoldEl.offsetWidth;
+      pinHoldEl.classList.add('shake');
+      shakeTimer = setTimeout(function () { pinHoldEl.classList.remove('shake'); }, 500);
+    } else {
+      hintEl.textContent = 'Drag the safety pin out of the button to arm it';
+    }
+  }
+
+  function startHold() {
+    if (!pinPulled || holding) return;
+    holding = true;
+    pinHoldEl.classList.add('holding');
+    var start = performance.now();
+    var lastSec = -1;
+    function tick(now: number) {
+      var p = Math.min(1, (now - start) / HOLD_MS);
+      ringFill.style.strokeDashoffset = String(RING_CIRC * (1 - p));
+      setAppSaturate(1 - 0.85 * p);
+      var sec = Math.max(1, Math.ceil((HOLD_MS - (now - start)) / 1000));
+      if (sec !== lastSec) {
+        lastSec = sec;
+        holdLabel.textContent = sec + '\u2026';
+      }
+      if (p >= 1) {
+        fireErase();
+        return;
+      }
+      holdRaf = requestAnimationFrame(tick);
+    }
+    holdRaf = requestAnimationFrame(tick);
+  }
+
+  function cancelHold() {
+    if (!holding) return;
+    holding = false;
+    cancelAnimationFrame(holdRaf);
+    holdRaf = 0;
+    pinHoldEl.classList.remove('holding');
+    ringFill.style.strokeDashoffset = String(RING_CIRC);
+    setAppSaturate(1);
+    disarmPin(true);
+  }
+
+  function fireErase() {
+    holding = false;
+    holdRaf = 0;
+    pinHoldEl.classList.remove('holding');
+    ringFill.style.strokeDashoffset = '0';
+    holdLabel.textContent = 'Erasing\u2026';
+    setAppSaturate(1);
+    if (navigator.vibrate) navigator.vibrate(60);
+    setTimeout(function () {
+      closeEraseModal();
+      eraseAll();
+    }, 300);
   }
 
   $('resetDataBtn').addEventListener('click', openEraseModal);
@@ -1440,21 +1552,55 @@
   $('eraseModal').addEventListener('click', function (e) {
     if ((e.target as HTMLElement).id === 'eraseModal') closeEraseModal();
   });
-  $('eraseInput').addEventListener('input', function () {
-    var v = (this as HTMLInputElement).value.trim().toUpperCase();
-    var ok = v === 'DELETE ALL';
-    ($('eraseGo') as HTMLButtonElement).disabled = !ok;
-    $('eraseGo')!.classList.toggle('enabled', ok);
+
+  pinEl.addEventListener('pointerdown', function (e) {
+    if (pinPulled || holding) return;
+    e.preventDefault();
+    dragPid = e.pointerId;
+    dragStartX = e.clientX;
+    dragX = 0;
+    pinEl.setPointerCapture(dragPid);
+    pinHoldEl.classList.add('dragging');
   });
-  $('eraseInput').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !($('eraseGo') as HTMLButtonElement).disabled) {
-      closeEraseModal();
-      eraseAll();
+  pinEl.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== dragPid) return;
+    dragX = Math.max(0, Math.min(pinMaxX(), e.clientX - dragStartX));
+    pinEl.style.setProperty('--pin-x', dragX + 'px');
+  });
+  function endPinDrag(e: PointerEvent) {
+    if (e.pointerId !== dragPid) return;
+    dragPid = -1;
+    pinHoldEl.classList.remove('dragging');
+    if (dragX >= pinMaxX() * 0.65) armPin();
+    else pinEl.style.setProperty('--pin-x', '0px');
+  }
+  pinEl.addEventListener('pointerup', endPinDrag);
+  pinEl.addEventListener('pointercancel', endPinDrag);
+  pinEl.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (pinPulled) disarmPin(false);
+    else armPin();
+  });
+
+  holdBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    holdBtn.setPointerCapture(e.pointerId);
+    startHold();
+  });
+  holdBtn.addEventListener('pointerup', cancelHold);
+  holdBtn.addEventListener('pointercancel', cancelHold);
+  holdBtn.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
+      e.preventDefault();
+      startHold();
     }
   });
-  $('eraseGo').addEventListener('click', function () {
-    closeEraseModal();
-    eraseAll();
+  holdBtn.addEventListener('keyup', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') cancelHold();
+  });
+  holdBtn.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
   });
 
   $('updateBtn').addEventListener('click', function () {

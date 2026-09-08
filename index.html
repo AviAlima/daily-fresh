@@ -421,11 +421,26 @@
   <div class="modal erase-modal">
     <button class="modal-close" id="eraseClose" aria-label="Close">&times;</button>
     <h2>Erase everything?</h2>
-    <p>All tasks, notes and history will be deleted from this device and from sync. This cannot be undone — type <strong>DELETE ALL</strong> below to confirm.</p>
-    <input type="text" id="eraseInput" placeholder="Type DELETE ALL to confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">
+    <p>All tasks, notes and history will be deleted from this device and from sync. This cannot be undone.</p>
+    <div class="pin-hold" id="pinHold">
+      <button class="hold-btn" id="eraseGo" disabled>
+        <svg class="hold-ring" viewBox="0 0 44 44" aria-hidden="true">
+          <circle class="hold-ring-track" cx="22" cy="22" r="19"></circle>
+          <circle class="hold-ring-fill" id="holdRingFill" cx="22" cy="22" r="19"></circle>
+        </svg>
+        <span id="eraseGoLabel">Pull the pin first</span>
+      </button>
+      <div class="pin-slot" aria-hidden="true"></div>
+      <div class="pin" id="erasePin" role="button" tabindex="0" aria-label="Safety pin. Drag it out of the button to arm the erase button">
+        <div class="pin-inner">
+          <span class="pin-ring"></span>
+          <span class="pin-stem"></span>
+        </div>
+      </div>
+    </div>
+    <p class="pin-hint" id="pinHint" aria-live="polite">Drag the safety pin out of the button to arm it</p>
     <div class="erase-actions">
       <button class="timer-btn" id="eraseCancel">Cancel</button>
-      <button class="danger-btn" id="eraseGo" disabled>Erase everything</button>
     </div>
   </div>
 </div>
