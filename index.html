@@ -85,6 +85,16 @@
     <div class="dash-strip" id="dashStrip"></div>
 
     <section class="view" id="todayView">
+      <div class="day-overview" aria-label="Today's progress">
+        <div class="overview-heading"><span class="overview-kicker">A LITTLE PROGRESS, EVERY DAY</span><span class="overview-percent" id="overviewPercent">0%</span></div>
+        <h2>Make space for what matters.</h2>
+        <div class="overview-track" role="progressbar" aria-label="Tasks completed today" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="overviewProgress"><span id="overviewFill"></span></div>
+        <div class="overview-stats">
+          <div><strong id="overviewRemaining">0</strong><span>to do</span></div>
+          <div><strong id="overviewDone">0</strong><span>completed</span></div>
+          <div><strong id="overviewPlanned">—</strong><span>planned</span></div>
+        </div>
+      </div>
       <div class="add-row" id="addRow">
         <button class="add-btn" id="addBtn" title="Add task (Enter)">+</button>
         <input id="taskInput" aria-label="New task" enterkeyhint="done" type="text" dir="auto" placeholder="Add a task, press Enter" autocomplete="off">

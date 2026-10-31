@@ -731,6 +731,13 @@
     var remaining = open.length;
     els.listTitle.textContent = tasks.length ? 'Tasks' : '';
     var planned = open.reduce(function (a, t) { return a + (t.estimate || 0); }, 0);
+    var percent = tasks.length ? Math.round(done.length / tasks.length * 100) : 0;
+    $('overviewPercent').textContent = percent + '%';
+    $('overviewProgress').setAttribute('aria-valuenow', String(percent));
+    $('overviewFill').style.width = percent + '%';
+    $('overviewRemaining').textContent = String(remaining);
+    $('overviewDone').textContent = String(done.length);
+    $('overviewPlanned').textContent = planned ? fmtEstimate(planned) : '—';
     els.listSub.textContent = tasks.length
       ? remaining + (remaining === 1 ? ' remaining' : ' remaining') + (planned ? ' \u00b7 ' + fmtEstimate(planned) + ' planned' : '')
       : '';
@@ -1082,8 +1089,10 @@
     els.editDate.value = '';
     showDialog('editModal');
     editOpenAt = Date.now();
-    els.editText.focus();
-    els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
+    if (!isTouchScreen()) {
+      els.editText.focus();
+      els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
+    }
   }
 
   function closeEdit() {
@@ -1949,7 +1958,7 @@
     dialogReturnFocus = document.activeElement as HTMLElement | null;
     $(id).classList.remove('hidden');
     document.documentElement.classList.add('dialog-open');
-    var first = $(id).querySelector<HTMLElement>('input, button');
+    var first = $(id).querySelector<HTMLElement>(isTouchScreen() ? 'button' : 'input, button');
     if (first) first.focus();
   }
 
@@ -2001,6 +2010,8 @@
   function kbdSpace() {
     var vv = window.visualViewport;
     if (!vv) return false;
+    document.documentElement.style.setProperty('--visible-height', vv.height + 'px');
+    document.documentElement.style.setProperty('--visible-top', vv.offsetTop + 'px');
     var th = kbdOpen ? 0.95 : 0.80;
     var open = vv.height < window.innerHeight * th;
     var space = open ? Math.max(0, Math.round(window.innerHeight - vv.height)) : 0;
@@ -2085,6 +2096,7 @@
   /* ================= Keyboard focus helpers ================= */
 
   function bringFocusedIntoView(el: Element | null) {
+    if (el && el.closest('.modal-backdrop')) return;
     if (!document.body.classList.contains('keyboard-open')) return;
     if (el && typeof el.scrollIntoView === 'function') {
       setTimeout(function () {
@@ -2096,11 +2108,12 @@
   }
 
   if (window.visualViewport) {
+    window.visualViewport.addEventListener('scroll', kbdSpace);
     window.visualViewport.addEventListener('resize', function () {
       var flipped = kbdSpace();
       if (flipped && kbdOpen) {
         var el = document.activeElement;
-        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+        if (el && !el.closest('.modal-backdrop') && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
           var target = el;
           setTimeout(function () {
             if (document.activeElement === target) {

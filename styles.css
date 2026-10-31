@@ -21,6 +21,8 @@
   --kbd-space: 0px;
 }
 
+.day-overview { display: none; }
+
 html[data-theme="light"] {
   --bg: #f4f5f8;
   --bg-soft: #eceef3;
@@ -1635,4 +1637,16 @@ html .check::before { content: ""; position: absolute; width: 44px; height: 44px
 @media (max-width: 720px) {
   html[data-ui] .hero .halo { width: 40px; height: 40px; flex-shrink: 0; }
   html[data-ui] .hero .date { font-size: 11px; line-height: 1.4; }
+}
+
+/* Keep dialogs inside the visible area when a mobile keyboard opens. */
+html .modal-backdrop {
+  top: var(--visible-top, 0px);
+  bottom: auto;
+  height: var(--visible-height, 100dvh);
+}
+html .modal { max-height: calc(var(--visible-height, 100dvh) - 32px); }
+@media (max-width: 720px) {
+  html .modal-backdrop { padding: 12px; }
+  html .modal { border-radius: 24px; border: 1px solid var(--border-hi, var(--border)); padding-bottom: 24px; max-height: calc(var(--visible-height, 100dvh) - 24px); }
 }
