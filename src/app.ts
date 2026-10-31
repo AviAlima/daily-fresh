@@ -500,6 +500,9 @@
     syncLogView: $('syncLogView')
   };
 
+  // Keep the editor outside the app's stacking context so it can cover other sheets.
+  document.body.appendChild(els.editModal);
+
   /* ================= Sounds ================= */
 
   var audioCtx: AudioContext | null = null;
