@@ -2400,6 +2400,7 @@ html[data-theme="light"][data-palette="clay"] { --bg:#f6efe6; --bg-soft:#efe2d5;
   pointer-events: none;
   animation: completion-row-leave .38s ease-in both;
 }
+.task.completing, .task.completing:hover { transform: none; }
 @keyframes completion-check-pop {
   0% { transform: scale(.72); }
   62% { transform: scale(1.2); }
@@ -2412,7 +2413,7 @@ html[data-theme="light"][data-palette="clay"] { --bg:#f6efe6; --bg-soft:#efe2d5;
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2) rotate(12deg); }
 }
 @keyframes completion-row-leave {
-  to { opacity: 0; transform: translateY(-5px) scale(.985); max-height: 0; margin-block: -5px; padding-block: 0; border-width: 0; }
+  to { opacity: 0; }
 }
 .palette-setting { flex-wrap: wrap; }
 .palette-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }

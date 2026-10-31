@@ -201,6 +201,17 @@
       var celebrationKey = activeDay + '|' + id;
       var celebrationToken = Date.now();
       celebratingTasks[celebrationKey] = celebrationToken;
+      var completionRow = Array.prototype.find.call(document.querySelectorAll('.task[data-id]'), function (el: HTMLElement) {
+        return el.dataset.id === id;
+      }) as HTMLElement | undefined;
+      if (completionRow) {
+        completionRow.classList.add('done', 'completing');
+        var completionCheck = completionRow.querySelector<HTMLElement>('[data-check]');
+        if (completionCheck) {
+          completionCheck.setAttribute('aria-pressed', 'true');
+          completionCheck.setAttribute('aria-label', 'Mark incomplete: ' + task.text);
+        }
+      }
       task.doneAt = Date.now();
       if (task.carriedFrom) closeOrigin(task.carriedFrom);
       if (day.focus === id) day.focus = null;
@@ -740,7 +751,21 @@
     els.dayDate.textContent = fullDateLabel(activeDay);
     renderDash();
 
-    els.taskList.innerHTML = orderedTasks(open.concat(celebrating)).map(function (t) { return taskHtml(t, activeDay); }).join('');
+    var visibleTasks = orderedTasks(open.concat(celebrating));
+    var preservedRows = Array.prototype.slice.call(els.taskList.querySelectorAll('.task.completing')) as HTMLElement[];
+    preservedRows = preservedRows.filter(function (row) {
+      return celebrating.some(function (t) { return t.id === row.dataset.id; });
+    });
+    els.taskList.innerHTML = visibleTasks.map(function (t) {
+      var preserveIndex = preservedRows.findIndex(function (row) { return row.dataset.id === t.id; });
+      return preserveIndex >= 0
+        ? '<li class="completion-preserve-slot" data-completion-slot="' + preserveIndex + '"></li>'
+        : taskHtml(t, activeDay);
+    }).join('');
+    preservedRows.forEach(function (row, index) {
+      var placeholder = els.taskList.querySelector('[data-completion-slot="' + index + '"]');
+      if (placeholder) placeholder.replaceWith(row);
+    });
 
     els.doneList.innerHTML = done.map(function (t) { return taskHtml(t, activeDay); }).join('');
     els.doneCount.textContent = done.length ? ' \u00b7 ' + done.length : '';
