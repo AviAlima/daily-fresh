@@ -30,6 +30,7 @@ interface SyncApi {
   getStatus(): {
     state: 'off' | 'synced' | 'pending' | 'error' | 'stale' | 'desync';
     lastContact: number;
+    online: boolean;
     dirty: boolean;
     error: string | null;
   };

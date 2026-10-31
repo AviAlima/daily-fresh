@@ -604,6 +604,17 @@
     }
   }
 
+  function syncDescription(st: ReturnType<SyncApi['getStatus']>): string {
+    if (st.state === 'synced') return 'Saved to cloud — confirmed by the server';
+    if (st.state === 'pending') return 'Syncing — waiting for server confirmation';
+    if (st.state === 'error') return 'Sync failed — changes stay on this device; retrying';
+    if (st.state === 'desync') return 'Reconciling changes — saved on this device';
+    if (st.state === 'stale') return st.online
+      ? 'Reconnecting — server connection not yet confirmed'
+      : 'Offline — changes stay on this device until you reconnect';
+    return 'Sync is off — saved on this device';
+  }
+
   function renderSyncStatus() {
     var pill = els.syncPill;
     if (!pill || !window.Sync || !window.Sync.getStatus || !window.Sync.isConfigured()) return;
@@ -614,16 +625,18 @@
     if (st.state === 'synced') {
       text = 'Synced';
     } else if (st.state === 'desync') {
-      text = 'Out of sync';
+      text = 'Reconciling';
     } else if (st.state === 'pending') {
       text = 'Syncing\u2026';
     } else if (st.state === 'error') {
       text = 'Sync error';
     } else {
-      text = 'Offline';
+      text = st.online ? 'Reconnecting' : 'Offline';
     }
     pill.classList.remove('synced', 'pending', 'error', 'stale', 'desync');
     pill.classList.add(st.state);
+    pill.title = syncDescription(st);
+    pill.setAttribute('aria-label', syncDescription(st));
     if (els.syncPillLabel.textContent !== text) els.syncPillLabel.textContent = text;
   }
 
@@ -644,28 +657,20 @@
     els.syncBody.classList.toggle('hidden', !paired);
     els.syncPairWrap.style.display = paired ? 'none' : '';
     if (!paired) {
+      els.syncStatus.classList.remove('offline', 'desync');
+      els.syncReveal.dataset.open = '0';
+      els.syncReveal.textContent = 'Show code';
+      els.syncCode.textContent = '';
+      els.syncQr.replaceChildren();
       els.syncStatus.textContent = 'Link this device to your other one';
       return;
     }
     var st = window.Sync.getStatus ? window.Sync.getStatus() : null;
     els.syncStatus.classList.remove('offline', 'desync');
     if (st) {
-      if (st.state === 'error') {
-        els.syncStatus.textContent = 'Sync failed \u2014 will retry';
-        els.syncStatus.classList.add('offline');
-      } else if (st.state === 'desync') {
-        els.syncStatus.textContent = 'Out of sync \u2014 waiting for the server to confirm your changes';
-        els.syncStatus.classList.add('desync');
-      } else if (st.state === 'stale') {
-        els.syncStatus.textContent = st.dirty
-          ? 'Offline \u2014 changes saved locally, will sync'
-          : 'Offline \u2014 will sync when back online';
-        els.syncStatus.classList.add('offline');
-      } else if (st.state === 'pending') {
-        els.syncStatus.textContent = 'Syncing \u2014 sending your changes';
-      } else {
-        els.syncStatus.textContent = 'Live \u2014 everything up to date';
-      }
+      els.syncStatus.textContent = syncDescription(st);
+      els.syncStatus.classList.toggle('offline', st.state === 'error' || st.state === 'stale');
+      els.syncStatus.classList.toggle('desync', st.state === 'desync');
     }
     var code = window.Sync.getCode();
     var codeChanged = els.syncCode.textContent !== code;
