@@ -576,6 +576,15 @@ html.no-scroll-drag {
   unicode-bidi: plaintext;
 }
 
+/* Flex children do not always inherit the row's text alignment reliably.
+   Anchor user-authored copy to the start edge selected by its direction. */
+.task[dir="rtl"] .task-text,
+.carry-choice[dir="rtl"] .carry-text,
+.day-card li[dir="rtl"] > span:not(.tick) { text-align: right; }
+.task[dir="ltr"] .task-text,
+.carry-choice[dir="ltr"] .carry-text,
+.day-card li[dir="ltr"] > span:not(.tick) { text-align: left; }
+
 .task.done .task-text {
   color: var(--text-dim);
   opacity: 0.55;

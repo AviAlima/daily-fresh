@@ -2595,6 +2595,12 @@ html #carryToggle { width: 44px; height: 44px; position: relative; border: 1px s
 /* Direction follows user-authored text; controls and technical codes stay LTR. */
 .task[dir="rtl"], .carry-choice[dir="rtl"], .day-card li[dir="rtl"] { direction: rtl; }
 .task[dir="ltr"], .carry-choice[dir="ltr"], .day-card li[dir="ltr"] { direction: ltr; }
+.task[dir="rtl"] .task-text,
+.carry-choice[dir="rtl"] .carry-text,
+.day-card li[dir="rtl"] > span:not(.tick) { text-align: right; }
+.task[dir="ltr"] .task-text,
+.carry-choice[dir="ltr"] .carry-text,
+.day-card li[dir="ltr"] > span:not(.tick) { text-align: left; }
 .carry-choice[dir="rtl"] .carry-day { direction: ltr; }
 .sync-panel, .sync-code-row, .sync-actions, .sync-log-card { direction: ltr; }
 
