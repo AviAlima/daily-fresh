@@ -1,6 +1,6 @@
 declare const sw: ServiceWorkerGlobalScope;
 
-const CACHE = 'daily-fresh-v94';
+const CACHE = 'daily-fresh-v95';
 
 const ASSETS = [
   './',
