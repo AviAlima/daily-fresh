@@ -2367,6 +2367,7 @@ html[data-theme="light"][data-palette="clay"] { --bg:#f6efe6; --bg-soft:#efe2d5;
 }
 
 /* A completed task gets a brief, palette-colored moment before it settles away. */
+.task { animation: none; }
 .task.done .check {
   background: var(--accent);
   border-color: var(--accent);
