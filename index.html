@@ -76,6 +76,12 @@
           </svg>
           <span class="ring-count" id="ringCount"></span>
         </div>
+        <span class="carry-launcher" id="carryWrap">
+          <button class="icon-btn" id="carryToggle" title="Unfinished tasks" aria-label="Unfinished tasks" aria-haspopup="dialog" aria-controls="carryModal">
+            <span id="carryIcon" aria-hidden="true"></span>
+            <span class="carry-badge hidden" id="carryCount" aria-hidden="true"></span>
+          </button>
+        </span>
         <button class="sync-pill hidden" id="syncPill" title="Sync status">
           <span class="sync-dot"></span>
           <span class="sync-label" id="syncPillLabel"></span>
@@ -113,14 +119,6 @@
             Start 25 min session
           </button>
         </div>
-      </div>
-
-      <div class="carry hidden" id="carryWrap">
-        <button class="carry-header" id="carryToggle" aria-haspopup="dialog" aria-controls="carryModal">
-          <span>Unfinished from previous days</span>
-          <span class="carry-count" id="carryCount"></span>
-          <span aria-hidden="true">↗</span>
-        </button>
       </div>
 
       <div class="list-head" id="listHead">
@@ -283,6 +281,11 @@
           <button class="palette-option" data-palette="plum" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#251c2b"></i><i style="background:#d5b2e0"></i><i style="background:#e8c4c4"></i></span>Plum</button>
           <button class="palette-option" data-palette="clay" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#29211e"></i><i style="background:#e6b59c"></i><i style="background:#d4c89e"></i></span>Clay</button>
         </div>
+      </div>
+
+      <div class="setting-row icon-setting">
+        <div class="setting-label"><span>Unfinished tasks icon</span><span class="setting-sub">Your shortcut to tasks from previous days</span></div>
+        <div class="carry-icon-picker" id="carryIconPicker" role="group" aria-label="Unfinished tasks icon"></div>
       </div>
 
       <div class="setting-row">

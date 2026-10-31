@@ -2318,3 +2318,19 @@ html #syncBody .sync-code-row:first-child button { flex: 1 1 0; min-width: 0; mi
   html .setting-row:has(.data-description) .setting-label { flex: 1 1 auto; }
   html #resetDataBtn { flex: 0 0 auto; padding: 10px 8px; font-size: 11px; min-height: 44px; white-space: nowrap; }
 }
+
+.carry-launcher { display: inline-flex; }
+html #carryToggle { width: 44px; height: 44px; position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+#carryIcon { display: inline-flex; }
+.carry-badge { position: absolute; top: -5px; right: -5px; padding: 2px 5px; min-width: 18px; border-radius: 20px; background: var(--accent); color: var(--bg); font-size: 10px; font-weight: 700; border: 2px solid var(--bg); }
+.carry-empty { color: var(--text-dim); font-size: 14px; line-height: 1.7; padding: 28px 4px; }
+.icon-setting { flex-wrap: wrap; }
+.carry-icon-picker { width: 100%; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.carry-icon-option { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; padding: 14px 4px; border: 1px solid var(--border); border-radius: 12px; color: var(--text-dim); background: var(--bg-soft); cursor: pointer; font-family: inherit; font-size: 10px; }
+.carry-icon-option[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 720px) {
+  /* A viewport-fixed bar avoids sticky-layer painting glitches after reload. */
+  html .sidebar { position: fixed; inset: 0 0 auto; z-index: 60; width: 100%; height: calc(65px + env(safe-area-inset-top, 0px)); transform: translateZ(0); }
+  html .app { padding-top: calc(65px + env(safe-area-inset-top, 0px)); }
+  html .top-right { gap: 10px; }
+}

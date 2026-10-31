@@ -785,7 +785,10 @@
 
   function renderCarry() {
     var candidates = carryCandidates();
-    els.carryWrap.classList.toggle('hidden', candidates.length === 0);
+    els.carryToggle.setAttribute('aria-label', 'Unfinished tasks (' + candidates.length + ')');
+    els.carryToggle.title = candidates.length ? candidates.length + ' unfinished tasks' : 'No unfinished tasks';
+    els.carryCount.classList.toggle('hidden', candidates.length === 0);
+    ($('carryAll') as HTMLButtonElement).disabled = candidates.length === 0;
     els.carryCount.textContent = String(candidates.length);
     var available = new Set(candidates.map(function (c) { return carryKey(c.day, c.task.id); }));
     selectedCarry.forEach(function (key) { if (!available.has(key)) selectedCarry.delete(key); });
@@ -794,14 +797,12 @@
       return '<label class="carry-choice"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
         '<span class="carry-choice-copy"><span class="carry-day">' + dayLabel(c.day) + '</span>' +
         '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span></span></label>';
-    }).join('');
+    }).join('') || '<p class="carry-empty">Nothing waiting here. Unfinished tasks from previous days will appear here when you need them.</p>';
     updateCarrySelection();
-    if (!candidates.length && !$('carryModal').classList.contains('hidden')) closeCarry();
   }
 
   function closeCarry() {
     hideDialog('carryModal');
-    if (els.carryWrap.classList.contains('hidden')) $('addBtn').focus({ preventScroll: true });
   }
 
   function renderNote() {
@@ -1073,7 +1074,7 @@
   els.carryToggle.addEventListener('click', function () {
     selectedCarry.clear();
     renderCarry();
-    if (carryCandidates().length) showDialog('carryModal');
+    showDialog('carryModal');
   });
   $('carryClose').addEventListener('click', closeCarry);
   $('carryModal').addEventListener('click', function (e) {
@@ -1289,6 +1290,40 @@
     ($('compactToggle') as HTMLInputElement).checked = compact;
   }
 
+  const carryIcons: Array<{ key: string; label: string; paths: string }> = [
+    { key: 'history', label: 'History', paths: '<path d="M3 4v5h5"/><path d="M3.5 9a9 9 0 1 1-.3 6"/><path d="M12 7v5l3 2"/>' },
+    { key: 'clock', label: 'Clock', paths: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>' },
+    { key: 'bulb', label: 'Idea', paths: '<path d="M9 18h6M9 21h6M8 14a6 6 0 1 1 8 0l-1 2H9z"/>' },
+    { key: 'calendar', label: 'Calendar', paths: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"/>' },
+    { key: 'inbox', label: 'Inbox', paths: '<path d="M5 4h14l3 11v5H2v-5zM2 15h6l2 3h4l2-3h6"/>' },
+    { key: 'bookmark', label: 'Bookmark', paths: '<path d="M6 3h12v18l-6-4-6 4z"/>' },
+    { key: 'sparkles', label: 'Sparkles', paths: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 2v4M18 4h4"/>' },
+    { key: 'rewind', label: 'Rewind', paths: '<path d="m11 5-9 7 9 7zm11 0-9 7 9 7z"/>' },
+    { key: 'archive', label: 'Archive', paths: '<rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v13h14V8M9 12h6"/>' },
+    { key: 'sunrise', label: 'Sunrise', paths: '<path d="M2 20h20M2 16h20M6 16a6 6 0 0 1 12 0M12 2v4M3 8l3 3M21 8l-3 3"/>' }
+  ];
+  function carryIconSvg(paths: string): string {
+    return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+  }
+  function applyCarryIcon(key: string) {
+    var chosen = carryIcons.find(function (icon) { return icon.key === key; }) || carryIcons[0];
+    $('carryIcon').innerHTML = carryIconSvg(chosen.paths);
+    document.querySelectorAll<HTMLElement>('[data-carry-icon]').forEach(function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.carryIcon === chosen.key));
+    });
+  }
+  $('carryIconPicker').innerHTML = carryIcons.map(function (icon) {
+    return '<button class="carry-icon-option" data-carry-icon="' + icon.key + '" aria-pressed="false">' + carryIconSvg(icon.paths) + '<span>' + icon.label + '</span></button>';
+  }).join('');
+  try { applyCarryIcon(localStorage.getItem('daily-fresh-carry-icon') || 'history'); } catch (e) { applyCarryIcon('history'); }
+  $('carryIconPicker').addEventListener('click', function (e) {
+    var button = (e.target as HTMLElement).closest<HTMLElement>('[data-carry-icon]');
+    if (!button) return;
+    var key = button.dataset.carryIcon || 'history';
+    applyCarryIcon(key);
+    try { localStorage.setItem('daily-fresh-carry-icon', key); } catch (e) {}
+  });
+
   function updateHeroIcon() {
     var h = new Date().getHours();
     var el = document.getElementById('heroIcon');
@@ -1498,30 +1533,31 @@
     eraseAll();
   });
 
-  $('updateBtn').addEventListener('click', function () {
-    if (!confirm('Check for updates? The app will clear its cache and reload.')) return;
-    var done = false;
-    function reloadNow() {
-      if (done) return;
-      done = true;
-      toast('Reloading\u2026');
-      setTimeout(function () { location.reload(); }, 250);
+  $('updateBtn').addEventListener('click', async function () {
+    var button = $('updateBtn') as HTMLButtonElement;
+    button.disabled = true;
+    button.textContent = 'Updating…';
+    dismissKeyboard();
+    try {
+      if (navigator.serviceWorker) {
+        var registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          await Promise.race([registration.update(), new Promise<void>(function (resolve) { setTimeout(resolve, 5000); })]);
+          if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+      if (window.caches) {
+        var keys = await caches.keys();
+        await Promise.all(keys.filter(function (key) { return key.startsWith('daily-fresh-'); }).map(function (key) { return caches.delete(key); }));
+      }
+      var url = new URL(location.href);
+      url.searchParams.set('_refresh', String(Date.now()));
+      location.replace(url.toString());
+    } catch (e) {
+      button.disabled = false;
+      button.textContent = 'Update';
+      toast('Could not check for updates. Try again when connected.');
     }
-    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-      navigator.serviceWorker.getRegistrations().then(function (regs) {
-        regs.forEach(function (r) {
-          if (r.waiting) { try { r.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {} }
-        });
-      }).catch(function () {});
-    }
-    if (window.caches && caches.keys) {
-      caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      }).then(reloadNow).catch(reloadNow);
-    } else {
-      reloadNow();
-    }
-    setTimeout(reloadNow, 1500);
   });
 
   /* ================= Backup ================= */
@@ -2053,71 +2089,23 @@
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
   }
 
-  /* ================= WhatsApp-style keyboard drag-dismiss =================
-     With the keyboard open, dragging down anywhere on the content slides the
-     page down with the finger; releasing past ~0.75cm (~44pt on iPhone)
-     dismisses the keyboard, below it snaps back. Starts only on background
-     areas so it never fights task long-press or drag-reorder. */
-  var KB_DISMISS_MIN = 44;
-  var kbDrag: { startY: number; startX: number; dy: number; active: boolean; passive: boolean; el: HTMLElement } | null = null;
-
-  function kbDragApp(): HTMLElement | null {
-    return document.querySelector('.app');
-  }
-
+  /* Keep native scrolling; never transform the app or its fixed navigation. */
+  var keyboardTouch: { x: number; y: number } | null = null;
   document.addEventListener('touchstart', function (e) {
-    if (!document.body.classList.contains('keyboard-open')) return;
-    if (kbDrag || e.touches.length !== 1) return;
-    var t = e.target as HTMLElement | null;
-    if (!t || t.closest('button, input, textarea, select, a, .modal-backdrop')) return;
-    var el = kbDragApp();
-    if (!el) return;
-    // Touches on tasks are tap-dismiss only — the move gesture belongs to
-    // the drag-reorder/long-press system.
-    var passive = !!t.closest('.task');
-    kbDrag = { startY: e.touches[0].clientY, startX: e.touches[0].clientX, dy: 0, active: false, passive: passive, el: el };
+    keyboardTouch = null;
+    if (!kbdOpen || e.touches.length !== 1) return;
+    var target = e.target as HTMLElement | null;
+    if (!target || target.closest('button, input, textarea, select, a, .task, .modal-backdrop')) return;
+    keyboardTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }, { passive: true });
-
-  document.addEventListener('touchmove', function (e) {
-    if (!kbDrag) return;
-    var dy = e.touches[0].clientY - kbDrag.startY;
-    var dx = e.touches[0].clientX - kbDrag.startX;
-    if (!kbDrag.active) {
-      if (kbDrag.passive) { kbDrag = null; return; }
-      // Decide the gesture intent on the first significant movement.
-      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
-      if (dy <= 8 || Math.abs(dx) > Math.abs(dy)) { kbDrag = null; return; }
-      kbDrag.active = true;
-      kbDrag.startY = e.touches[0].clientY - dy;
-      kbDrag.dy = 0;
-    }
-    if (e.cancelable) e.preventDefault();
-    dy = Math.max(0, dy);
-    kbDrag.dy = dy;
-    kbDrag.el.style.transition = 'none';
-    kbDrag.el.style.transform = 'translateY(' + Math.min(120, dy * 0.6) + 'px)';
-  }, { passive: false });
-
-  function kbDragEnd() {
-    if (!kbDrag) return;
-    var d = kbDrag;
-    kbDrag = null;
-    if (d.active) {
-      d.el.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1)';
-      d.el.style.transform = '';
-      if (d.dy >= KB_DISMISS_MIN) dismissKeyboard();
-    } else if (d.dy < 8) {
-      // A tap (no meaningful movement) on the content closes the keyboard.
-      dismissKeyboard();
-    }
-  }
-  document.addEventListener('touchend', kbDragEnd, { passive: true });
-  document.addEventListener('touchcancel', function () {
-    if (!kbDrag) return;
-    var d = kbDrag;
-    kbDrag = null;
-    if (d.active) { d.el.style.transition = 'transform 0.2s ease-out'; d.el.style.transform = ''; }
+  document.addEventListener('touchend', function (e) {
+    if (!keyboardTouch || !e.changedTouches.length) return;
+    var dx = e.changedTouches[0].clientX - keyboardTouch.x;
+    var dy = e.changedTouches[0].clientY - keyboardTouch.y;
+    keyboardTouch = null;
+    if ((Math.abs(dx) < 8 && Math.abs(dy) < 8) || (dy > 44 && Math.abs(dy) > Math.abs(dx))) dismissKeyboard();
   }, { passive: true });
+  document.addEventListener('touchcancel', function () { keyboardTouch = null; }, { passive: true });
 
   /* ================= Keyboard focus helpers ================= */
 
@@ -2224,6 +2212,13 @@
   setInterval(tick, 1000);
 
   /* ================= Boot ================= */
+
+  if (new URL(location.href).searchParams.has('_refresh')) {
+    var cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete('_refresh');
+    history.replaceState(null, '', cleanUrl.toString());
+  }
+
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
