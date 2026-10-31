@@ -2306,6 +2306,8 @@ html[data-theme="light"][data-palette="clay"] { --bg:#f6efe6; --bg-soft:#efe2d5;
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
+  order: -1;
+  margin-right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2360,7 +2362,7 @@ html[data-theme="light"][data-palette="clay"] { --bg:#f6efe6; --bg-soft:#efe2d5;
 .sync-pill.stale .sync-indicator { background: var(--text-faint); box-shadow: none; opacity: .7; }
 @keyframes sync-beam { 0%,100% { opacity: .45; transform: scaleX(.68); } 50% { opacity: 1; transform: scaleX(1); } }
 @media (max-width: 720px) {
-  .progress { margin-right: 0; }
+  .progress { margin-right: auto; }
   .top-right { gap: 8px; }
 }
 
