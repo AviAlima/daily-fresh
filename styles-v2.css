@@ -720,6 +720,7 @@ html.no-scroll-drag { overflow: hidden; }
 
 .task-text {
   flex: 1;
+  text-align: start;
   font-size: 15px;
   line-height: 1.4;
   word-break: break-word;

@@ -554,6 +554,7 @@ html.no-scroll-drag {
 
 .task-text {
   flex: 1;
+  text-align: start;
   font-size: 15px;
   line-height: 1.35;
   word-break: break-word;

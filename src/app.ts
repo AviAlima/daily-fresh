@@ -614,6 +614,7 @@
 
   function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
+    var direction = textDirection(t.text);
     var celebrating = !!celebratingTasks[dayKey + '|' + t.id];
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
@@ -621,10 +622,10 @@
       actions = '<div class="task-actions"><button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button></div>';
     }
     return (
-      '<li class="task' + (t.done ? ' done' : '') + (celebrating ? ' completing' : '') + '" data-id="' + t.id + '" dir="' + textDirection(t.text) + '">' +
+      '<li class="task' + (t.done ? ' done' : '') + (celebrating ? ' completing' : '') + '" data-id="' + t.id + '" dir="' + direction + '">' +
       '<button class="check" data-check="' + t.id + '" aria-pressed="' + t.done + '" aria-label="' + escapeHtml((t.done ? 'Mark incomplete: ' : 'Complete: ') + t.text) + '">' + checkSvg() +
       '<svg class="check-sparkles" viewBox="0 0 48 48" aria-hidden="true"><path d="M12 4.5l1.4 4.1 4.1 1.4-4.1 1.4L12 15.5l-1.4-4.1-4.1-1.4 4.1-1.4L12 4.5zM37 14l1.8 5.2 5.2 1.8-5.2 1.8L37 28l-1.8-5.2L30 21l5.2-1.8L37 14zM15 32l1.5 4.5L21 38l-4.5 1.5L15 44l-1.5-4.5L9 38l4.5-1.5L15 32z"/></svg></button>' +
-      '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
+      '<span class="task-text" dir="' + direction + '">' + escapeHtml(t.text) + '</span>' +
       estChip +
       actions +
       '</li>'
