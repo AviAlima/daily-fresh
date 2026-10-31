@@ -12,6 +12,7 @@
   var currentView = 'today';
   var doneOpen = false;
   var selectedCarry = new Set<string>();
+  var celebratingTasks: Record<string, number> = Object.create(null);
   var editId: string | null = null;
   var editOpenAt = 0;
   var toastTimer: number | null = null;
@@ -197,13 +198,29 @@
     if (!task.done) pushUndo();
     task.done = !task.done;
     if (task.done) {
+      var celebrationKey = activeDay + '|' + id;
+      var celebrationToken = Date.now();
+      celebratingTasks[celebrationKey] = celebrationToken;
       task.doneAt = Date.now();
       if (task.carriedFrom) closeOrigin(task.carriedFrom);
       if (day.focus === id) day.focus = null;
       completeChime();
       if (allDone()) setTimeout(function () { toast('All done \u2014 enjoy your day'); }, 300);
       else toast('Completed', { label: 'Undo', fn: doUndo });
+      setTimeout(function () {
+        if (celebratingTasks[celebrationKey] !== celebrationToken) return;
+        var row = Array.prototype.find.call(document.querySelectorAll('.task[data-id]'), function (el: HTMLElement) {
+          return el.dataset.id === id && activeDay + '|' + id === celebrationKey;
+        }) as HTMLElement | undefined;
+        if (row) row.classList.add('completion-exit');
+        setTimeout(function () {
+          if (celebratingTasks[celebrationKey] !== celebrationToken) return;
+          delete celebratingTasks[celebrationKey];
+          render();
+        }, 380);
+      }, 780);
     } else {
+      delete celebratingTasks[activeDay + '|' + id];
       task.doneAt = null;
     }
     save();
@@ -377,6 +394,11 @@
       });
     });
     state.days = before;
+    Object.keys(celebratingTasks).forEach(function (key) {
+      var parts = key.split('|');
+      var restored = state.days[parts[0]];
+      if (!restored || !restored.tasks.some(function (t) { return t.id === parts[1] && t.done; })) delete celebratingTasks[key];
+    });
     save();
     render();
     toast('Restored');
@@ -565,14 +587,16 @@
 
   function taskHtml(t: TaskShape, dayKey: string) {
     var isToday = dayKey === activeDay;
+    var celebrating = !!celebratingTasks[dayKey + '|' + t.id];
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
     if (isToday) {
       actions = '<div class="task-actions"><button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button></div>';
     }
     return (
-      '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
-      '<button class="check" data-check="' + t.id + '" aria-pressed="' + t.done + '" aria-label="' + escapeHtml((t.done ? 'Mark incomplete: ' : 'Complete: ') + t.text) + '">' + checkSvg() + '</button>' +
+      '<li class="task' + (t.done ? ' done' : '') + (celebrating ? ' completing' : '') + '" data-id="' + t.id + '">' +
+      '<button class="check" data-check="' + t.id + '" aria-pressed="' + t.done + '" aria-label="' + escapeHtml((t.done ? 'Mark incomplete: ' : 'Complete: ') + t.text) + '">' + checkSvg() +
+      '<svg class="check-sparkles" viewBox="0 0 48 48" aria-hidden="true"><path d="M12 4.5l1.4 4.1 4.1 1.4-4.1 1.4L12 15.5l-1.4-4.1-4.1-1.4 4.1-1.4L12 4.5zM37 14l1.8 5.2 5.2 1.8-5.2 1.8L37 28l-1.8-5.2L30 21l5.2-1.8L37 14zM15 32l1.5 4.5L21 38l-4.5 1.5L15 44l-1.5-4.5L9 38l4.5-1.5L15 32z"/></svg></button>' +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
       actions +
@@ -708,14 +732,15 @@
     var day = today();
     var tasks = orderedTasks(day.tasks);
     var open = tasks.filter(function (t) { return !t.done; });
-    var done = tasks.filter(function (t) { return t.done; });
+    var celebrating = tasks.filter(function (t) { return t.done && !!celebratingTasks[activeDay + '|' + t.id]; });
+    var done = tasks.filter(function (t) { return t.done && !celebratingTasks[activeDay + '|' + t.id]; });
 
     var g = greeting();
     if (g !== lastGreeting) { els.greeting.textContent = g; lastGreeting = g; }
     els.dayDate.textContent = fullDateLabel(activeDay);
     renderDash();
 
-    els.taskList.innerHTML = open.map(function (t) { return taskHtml(t, activeDay); }).join('');
+    els.taskList.innerHTML = orderedTasks(open.concat(celebrating)).map(function (t) { return taskHtml(t, activeDay); }).join('');
 
     els.doneList.innerHTML = done.map(function (t) { return taskHtml(t, activeDay); }).join('');
     els.doneCount.textContent = done.length ? ' \u00b7 ' + done.length : '';
