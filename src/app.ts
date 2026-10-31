@@ -571,12 +571,12 @@
     var isToday = dayKey === activeDay;
     var estChip = t.estimate ? '<span class="est-chip">' + fmtEstimate(t.estimate) + '</span>' : '';
     var actions = '';
-    if (isToday && !isTouchScreen()) {
+    if (isToday) {
       actions = '<div class="task-actions"><button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button></div>';
     }
     return (
       '<li class="task' + (t.done ? ' done' : '') + '" data-id="' + t.id + '">' +
-      '<button class="check" data-check="' + t.id + '" aria-label="Toggle done">' + checkSvg() + '</button>' +
+      '<button class="check" data-check="' + t.id + '" aria-pressed="' + t.done + '" aria-label="' + escapeHtml((t.done ? 'Mark incomplete: ' : 'Complete: ') + t.text) + '">' + checkSvg() + '</button>' +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
       estChip +
       actions +
@@ -944,6 +944,8 @@
     var candidates = carryCandidates().length;
     document.querySelectorAll<HTMLElement>('.nav-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.view === currentView);
+      if (b.dataset.view === currentView) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
     });
     var navToday = $('navToday');
     var badge = navToday.querySelector('.nav-count');
@@ -997,9 +999,9 @@
     document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
     $(view + 'View').classList.remove('hidden');
     renderNavBadges();
-    if (view === 'today') {
-      focusTaskInput();
-    } else if (view === 'history') {
+    dismissKeyboard();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (view === 'history') {
       calView = currentMonth();
       renderCalendar();
     }
@@ -1031,7 +1033,7 @@
   });
 
   els.taskInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') addCurrentTask();
+    if (e.key === 'Enter' && !e.isComposing) addCurrentTask();
   });
 
   function onTaskClick(e: MouseEvent) {
@@ -1078,7 +1080,7 @@
     els.editFocusBtn.textContent = day.focus === id ? 'Clear focus' : 'Set as focus';
     els.editPostponeRow.classList.add('hidden');
     els.editDate.value = '';
-    els.editModal.classList.remove('hidden');
+    showDialog('editModal');
     editOpenAt = Date.now();
     els.editText.focus();
     els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
@@ -1086,9 +1088,12 @@
 
   function closeEdit() {
     if (!editId) return;
+    var closedId = editId;
     editId = null;
-    els.editModal.classList.add('hidden');
+    hideDialog('editModal');
     render();
+    var editButton = Array.from(els.taskList.querySelectorAll<HTMLElement>('[data-edit]')).find(function (el) { return el.dataset.edit === closedId; });
+    if (editButton) editButton.focus({ preventScroll: true });
   }
 
   function postponeFromEdit(targetKey: string) {
@@ -1108,7 +1113,7 @@
     if (text) { editTask(editId, text); closeEdit(); }
   });
   els.editText.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') els.editSave.click();
+    if (e.key === 'Enter' && !e.isComposing) els.editSave.click();
     if (e.key === 'Escape') closeEdit();
   });
   els.editFocusBtn.addEventListener('click', function () {
@@ -1275,7 +1280,8 @@
   setInterval(updateHeroIcon, 60000);
 
   els.notesToggle.addEventListener('click', function () {
-    document.body.classList.toggle('notes-open');
+    var open = document.body.classList.toggle('notes-open');
+    els.notesToggle.setAttribute('aria-expanded', String(open));
   });
 
   try { applyUi(normalizeUi(localStorage.getItem(UI_KEY))); } catch (e) { applyUi('zen'); }
@@ -1423,7 +1429,7 @@
 
   function openEraseModal() {
     var modal = $('eraseModal');
-    modal.classList.remove('hidden');
+    showDialog('eraseModal');
     var input = $('eraseInput') as HTMLInputElement;
     input.value = '';
     $('eraseGo')!.classList.remove('enabled');
@@ -1432,7 +1438,7 @@
   }
 
   function closeEraseModal() {
-    $('eraseModal').classList.add('hidden');
+    hideDialog('eraseModal');
   }
 
   $('resetDataBtn').addEventListener('click', openEraseModal);
@@ -1832,14 +1838,14 @@
     var task = today().tasks.find(function (t) { return t.id === today().focus; });
     if (!task) return;
     $('focusTaskName').textContent = task.text;
-    $('focusModal').classList.remove('hidden');
+    showDialog('focusModal');
     var modalEl = $('focusModal').querySelector('.modal') as HTMLElement;
     modalEl.classList.remove('modal-zoom-out');
     updateTimerUI();
   }
 
   function closeFocusModal() {
-    $('focusModal').classList.add('hidden');
+    hideDialog('focusModal');
   }
 
   function syncTimer() {
@@ -1919,7 +1925,7 @@
   /* ================= Onboarding ================= */
 
   function openOnboarding() {
-    $('onboardModal').classList.remove('hidden');
+    showDialog('onboardModal');
     var nameInput = $<HTMLInputElement>('onboardName');
     if (state.settings.name) nameInput.value = state.settings.name;
     setTimeout(function () { nameInput.focus(); }, 100);
@@ -1930,17 +1936,50 @@
     if (name) state.settings.name = name;
     state.onboarded = true;
     save();
-    $('onboardModal').classList.add('hidden');
+    hideDialog('onboardModal');
     lastGreeting = '';
     render();
     focusTaskInput();
     toast('Welcome' + (name ? ', ' + name : '') + ' \u2014 a fresh page awaits');
   });
 
+  var dialogReturnFocus: HTMLElement | null = null;
+
+  function showDialog(id: string) {
+    dialogReturnFocus = document.activeElement as HTMLElement | null;
+    $(id).classList.remove('hidden');
+    document.documentElement.classList.add('dialog-open');
+    var first = $(id).querySelector<HTMLElement>('input, button');
+    if (first) first.focus();
+  }
+
+  function hideDialog(id: string) {
+    $(id).classList.add('hidden');
+    document.documentElement.classList.remove('dialog-open');
+    if (dialogReturnFocus && dialogReturnFocus.isConnected) dialogReturnFocus.focus({ preventScroll: true });
+  }
+
   /* ================= Keyboard ================= */
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === '/' && !isTyping(e.target)) {
+    var dialog = document.querySelector<HTMLElement>('.modal-backdrop:not(.hidden)');
+    if (dialog) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (dialog.id === 'editModal') closeEdit();
+        else if (dialog.id === 'focusModal') closeFocusModal();
+        else if (dialog.id === 'eraseModal') closeEraseModal();
+      }
+      if (e.key === 'Tab') {
+        var controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea, select, [tabindex="0"]')).filter(function (el) { return el.getClientRects().length > 0; });
+        var first = controls[0];
+        var last = controls[controls.length - 1];
+        if (first && e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (last && !e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target)) {
       e.preventDefault();
       switchView('today');
       focusTaskInput();
@@ -2161,7 +2200,7 @@
   var versionEl = $('appVersion');
   if (versionEl) versionEl.textContent = APP_VERSION;
   if (!state.onboarded) openOnboarding();
-  else focusTaskInput();
+  else if (!isTouchScreen()) focusTaskInput();
   if (window.Sync) {
     window.Sync.onStatus(function () { renderSync(); renderSyncStatus(); });
     window.Sync.init({ onRemote: function () { reloadFromDisk(); render(); } });

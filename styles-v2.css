@@ -1866,8 +1866,8 @@ html[data-ui="zen"] .kbd-hint { display: none; }
 html[data-ui="zen"] .note-card,
 html[data-ui="zen"] .reflection-card { display: none; }
 
-body.notes-open html[data-ui="zen"] .note-card,
-body.notes-open html[data-ui="zen"] .reflection-card { display: block; }
+html[data-ui="zen"] body.notes-open .note-card,
+html[data-ui="zen"] body.notes-open .reflection-card { display: block; }
 
 html[data-ui="zen"] .notes-toggle { display: flex; }
 
@@ -1906,8 +1906,7 @@ html[data-ui="focus"] .note-card,
 html[data-ui="focus"] .reflection-card { display: none; }
 
 html[data-ui="focus"] body.notes-open .note-card,
-body.notes-open html[data-ui="focus"] .note-card,
-body.notes-open html[data-ui="focus"] .reflection-card { display: block; }
+html[data-ui="focus"] body.notes-open .reflection-card { display: block; }
 
 html[data-ui="focus"] .notes-toggle { display: flex; }
 
