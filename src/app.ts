@@ -1698,6 +1698,7 @@
         getRegistration: async function () {
           return navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : undefined;
         },
+        timeoutMs: 15000,
         reload: function () {
           var url = new URL(location.href);
           url.searchParams.set('_refresh', String(Date.now()));
@@ -2380,7 +2381,7 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./dist/sw.js').catch(function () {});
+      navigator.serviceWorker.register('./dist/sw.js', { updateViaCache: 'none' }).catch(function () {});
     });
   }
 
