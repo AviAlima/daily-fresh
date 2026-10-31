@@ -487,6 +487,7 @@
     syncStartWrap: $('syncStartWrap'),
     syncStart: $<HTMLButtonElement>('syncStart'),
     syncBody: $('syncBody'),
+    syncCodeRow: $('syncCodeRow'),
     syncCode: $('syncCode'),
     syncReveal: $('syncReveal'),
     syncCopy: $<HTMLButtonElement>('syncCopy'),
@@ -594,6 +595,15 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function textDirection(text: string): 'rtl' | 'ltr' {
+    for (var char of text) {
+      var code = char.codePointAt(0) || 0;
+      if ((code >= 0x0590 && code <= 0x08ff) || (code >= 0xfb1d && code <= 0xfdff) || (code >= 0xfe70 && code <= 0xfefc) || (code >= 0x10800 && code <= 0x10fff)) return 'rtl';
+      if (/[A-Za-z]/.test(char) || char.toLowerCase() !== char.toUpperCase()) return 'ltr';
+    }
+    return 'ltr';
+  }
+
   function checkSvg() {
     return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   }
@@ -611,7 +621,7 @@
       actions = '<div class="task-actions"><button class="icon-btn" data-edit="' + t.id + '" title="Edit">' + pencilIcon() + '</button></div>';
     }
     return (
-      '<li class="task' + (t.done ? ' done' : '') + (celebrating ? ' completing' : '') + '" data-id="' + t.id + '">' +
+      '<li class="task' + (t.done ? ' done' : '') + (celebrating ? ' completing' : '') + '" data-id="' + t.id + '" dir="' + textDirection(t.text) + '">' +
       '<button class="check" data-check="' + t.id + '" aria-pressed="' + t.done + '" aria-label="' + escapeHtml((t.done ? 'Mark incomplete: ' : 'Complete: ') + t.text) + '">' + checkSvg() +
       '<svg class="check-sparkles" viewBox="0 0 48 48" aria-hidden="true"><path d="M12 4.5l1.4 4.1 4.1 1.4-4.1 1.4L12 15.5l-1.4-4.1-4.1-1.4 4.1-1.4L12 4.5zM37 14l1.8 5.2 5.2 1.8-5.2 1.8L37 28l-1.8-5.2L30 21l5.2-1.8L37 14zM15 32l1.5 4.5L21 38l-4.5 1.5L15 44l-1.5-4.5L9 38l4.5-1.5L15 32z"/></svg></button>' +
       '<span class="task-text" dir="auto">' + escapeHtml(t.text) + '</span>' +
@@ -701,6 +711,7 @@
       els.syncStatus.classList.remove('offline', 'desync');
       els.syncReveal.dataset.open = '0';
       els.syncReveal.textContent = 'Show code';
+      els.syncCodeRow.classList.add('hidden');
       els.syncCode.textContent = '';
       els.syncQr.replaceChildren();
       els.syncStatus.textContent = 'Link this device to your other one';
@@ -716,6 +727,8 @@
     var code = window.Sync.getCode();
     var codeChanged = els.syncCode.textContent !== code;
     var revealed = els.syncReveal.dataset.open === '1';
+    els.syncReveal.textContent = revealed ? 'Hide code' : 'Show code';
+    els.syncCodeRow.classList.toggle('hidden', !revealed);
     els.syncCode.textContent = revealed ? code : '';
     els.syncCode.classList.toggle('hidden', !revealed);
     els.syncCopy.classList.toggle('hidden', !revealed);
@@ -850,8 +863,8 @@
     selectedCarry.forEach(function (key) { if (!available.has(key)) selectedCarry.delete(key); });
     els.carryList.innerHTML = candidates.map(function (c) {
       var key = carryKey(c.day, c.task.id);
-      return '<div class="carry-choice"><label class="carry-selection"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
-        '<span class="carry-choice-copy"><span class="carry-day">' + dayLabel(c.day) + '</span>' +
+        return '<div class="carry-choice" dir="' + textDirection(c.task.text) + '"><label class="carry-selection"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
+        '<span class="carry-choice-copy"><span class="carry-day" dir="ltr">' + dayLabel(c.day) + '</span>' +
         '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span></span></label>' +
         '<button type="button" class="icon-btn carry-edit" data-carry-edit="' + c.task.id + '" data-carry-day="' + c.day + '" aria-label="Edit task: ' + escapeHtml(c.task.text) + '" title="Edit task">' + pencilIcon() + '</button></div>';
     }).join('') || '<p class="carry-empty">Nothing waiting here. Unfinished tasks from previous days will appear here when you need them.</p>';
@@ -947,7 +960,7 @@
     var lis = tasks.map(function (t) {
       var carried = t.carriedFrom ? '<span class="carried">\u00b7 carried</span>' : '';
       return (
-        '<li class="' + (t.done ? 'done' : '') + '">' +
+        '<li class="' + (t.done ? 'done' : '') + '" dir="' + textDirection(t.text) + '">' +
         '<span class="tick">' + checkSvg() + '</span>' +
         '<span dir="auto">' + escapeHtml(t.text) + '</span>' +
         carried +

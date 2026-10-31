@@ -245,34 +245,6 @@
     <section class="view hidden" id="settingsView">
       <h2 class="view-title">Settings</h2>
 
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Your name</span>
-          <span class="setting-sub">Used in the daily greeting</span>
-        </div>
-        <input type="text" id="nameInput" class="text-input" dir="auto" placeholder="e.g. Avi" maxlength="24">
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>New day starts at</span>
-          <span class="setting-sub">Your page resets fresh at this hour</span>
-        </div>
-        <select id="resetHour"></select>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Appearance</span>
-          <span class="setting-sub">Color theme</span>
-        </div>
-        <select id="themeSelect">
-          <option value="system">System</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
-      </div>
-
       <div class="setting-row" id="updateRow">
         <div class="setting-label">
           <span>App update</span>
@@ -284,116 +256,105 @@
         </div>
       </div>
 
-      <div class="setting-row palette-setting">
-        <div class="setting-label"><span>Color palette</span><span class="setting-sub">Choose your atmosphere</span></div>
-        <div class="palette-picker" role="group" aria-label="Color palette">
-          <button class="palette-option" data-palette="forest" aria-pressed="true"><span class="palette-swatches" aria-hidden="true"><i style="background:#101c20"></i><i style="background:#a4dfbd"></i><i style="background:#d5e7ad"></i></span>Forest</button>
-          <button class="palette-option" data-palette="ocean" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#121f32"></i><i style="background:#9fc9ef"></i><i style="background:#e2d4b1"></i></span>Ocean</button>
-          <button class="palette-option" data-palette="plum" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#251c2b"></i><i style="background:#d5b2e0"></i><i style="background:#e8c4c4"></i></span>Plum</button>
-          <button class="palette-option" data-palette="clay" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#29211e"></i><i style="background:#e6b59c"></i><i style="background:#d4c89e"></i></span>Clay</button>
-        </div>
-      </div>
-
-      <div class="setting-row icon-setting">
-        <div class="setting-label"><span>Home Screen icon</span><span class="setting-sub">Choose the icon for a new Home Screen shortcut</span></div>
-        <div class="icon-quick-picker" id="homeIconPicker" role="group" aria-label="Home Screen icon"></div>
-        <button class="icon-setup-link" id="homeIconSetup">How to add the chosen icon ↗</button>
-      </div>
-
-      <div class="setting-row icon-setting">
-        <div class="setting-label"><span>Unfinished tasks icon</span><span class="setting-sub">Your shortcut to tasks from previous days</span></div>
-        <div class="icon-quick-picker" id="carryIconPicker" role="group" aria-label="Unfinished tasks icon"></div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <label for="compactToggle">Minimal view</label>
-          <span class="setting-sub">Hide the daily overview and focus on your tasks</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="compactToggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Sounds</span>
-          <span class="setting-sub">Completion chime and focus bell</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="soundToggle" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-row hidden" id="installRow">
-        <div class="setting-label">
-          <span>Install app</span>
-          <span class="setting-sub">Add Daily Fresh to your home screen</span>
-        </div>
-        <button class="timer-btn primary" id="installBtn">Install</button>
-      </div>
-
-      <div class="setting-row sync-row" id="syncRow">
-        <div class="setting-label">
-          <span>Sync</span>
-          <span class="setting-sub" id="syncStatus"></span>
-        </div>
-        <div class="sync-controls">
-          <div id="syncStartWrap">
-            <button class="timer-btn primary" id="syncStart">Start sync</button>
+      <details class="settings-group">
+        <summary><span class="settings-group-title">Daily routine</span><span class="settings-group-hint">Your name and when a new day begins</span></summary>
+        <div class="settings-group-content">
+          <div class="setting-row">
+            <div class="setting-label"><span>Your name</span><span class="setting-sub">Used in the daily greeting</span></div>
+            <input type="text" id="nameInput" class="text-input" dir="auto" placeholder="e.g. Avi" maxlength="24">
           </div>
-          <div class="sync-enter-row" id="syncPairWrap">
-            <input type="text" id="syncInput" class="text-input" dir="ltr" autocomplete="off"
-                   placeholder="Enter code from another device">
-            <button class="timer-btn" id="syncPairBtn">Pair</button>
+          <div class="setting-row">
+            <div class="setting-label"><span>New day starts at</span><span class="setting-sub">Your page resets fresh at this hour</span></div>
+            <select id="resetHour"></select>
           </div>
-          <div class="hidden" id="syncBody">
-            <div class="sync-code-row">
-              <button class="timer-btn" id="syncReveal" data-open="0">Show code</button>
-              <button class="danger-btn sync-unpair" id="syncUnpair">Stop syncing</button>
+        </div>
+      </details>
+
+      <details class="settings-group">
+        <summary><span class="settings-group-title">Appearance</span><span class="settings-group-hint">Theme, colors, shortcuts and sound</span></summary>
+        <div class="settings-group-content">
+          <div class="setting-row">
+            <div class="setting-label"><span>Theme</span><span class="setting-sub">Light or dark</span></div>
+            <select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select>
+          </div>
+          <div class="setting-row palette-setting">
+            <div class="setting-label"><span>Color palette</span><span class="setting-sub">Choose your atmosphere</span></div>
+            <div class="palette-picker" role="group" aria-label="Color palette">
+              <button class="palette-option" data-palette="forest" aria-pressed="true"><span class="palette-swatches" aria-hidden="true"><i style="background:#101c20"></i><i style="background:#a4dfbd"></i><i style="background:#d5e7ad"></i></span>Forest</button>
+              <button class="palette-option" data-palette="ocean" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#121f32"></i><i style="background:#9fc9ef"></i><i style="background:#e2d4b1"></i></span>Ocean</button>
+              <button class="palette-option" data-palette="plum" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#251c2b"></i><i style="background:#d5b2e0"></i><i style="background:#e8c4c4"></i></span>Plum</button>
+              <button class="palette-option" data-palette="clay" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#29211e"></i><i style="background:#e6b59c"></i><i style="background:#d4c89e"></i></span>Clay</button>
             </div>
-            <div class="sync-code-row">
-              <code id="syncCode" dir="ltr"></code>
-              <button class="icon-btn hidden" id="syncCopy" title="Copy code">copy</button>
-            </div>
-            <div class="sync-qr hidden" id="syncQr"></div>
+          </div>
+          <div class="setting-row icon-setting">
+            <div class="setting-label"><span>Home Screen icon</span><span class="setting-sub">For a new Home Screen shortcut</span></div>
+            <div class="icon-quick-picker" id="homeIconPicker" role="group" aria-label="Home Screen icon"></div>
+            <button class="icon-setup-link" id="homeIconSetup">How to add the chosen icon ↗</button>
+          </div>
+          <div class="setting-row icon-setting">
+            <div class="setting-label"><span>Unfinished tasks icon</span><span class="setting-sub">Shortcut to tasks from past days</span></div>
+            <div class="icon-quick-picker" id="carryIconPicker" role="group" aria-label="Unfinished tasks icon"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label"><label for="compactToggle">Minimal view</label><span class="setting-sub">Hide the daily overview</span></div>
+            <label class="switch"><input type="checkbox" id="compactToggle"><span class="slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label"><span>Sounds</span><span class="setting-sub">Completion chime and focus bell</span></div>
+            <label class="switch"><input type="checkbox" id="soundToggle" checked><span class="slider"></span></label>
+          </div>
+          <div class="setting-row hidden" id="installRow">
+            <div class="setting-label"><span>Install app</span><span class="setting-sub">Add Daily Fresh to your Home Screen</span></div>
+            <button class="timer-btn primary" id="installBtn">Install</button>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Sync log</span>
-          <span class="setting-sub">Last sync events — copy to share diagnostics</span>
+      <details class="settings-group">
+        <summary><span class="settings-group-title">Sync between devices</span><span class="settings-group-hint">Pair, view your code, and check connection status</span></summary>
+        <div class="settings-group-content">
+          <div class="sync-panel" id="syncRow">
+            <div class="sync-panel-head">
+              <div><strong>Sync</strong><span class="setting-sub">Keep this device connected to your other one</span></div>
+              <span class="sync-status" id="syncStatus"></span>
+            </div>
+            <div class="sync-controls">
+              <div id="syncStartWrap"><button class="timer-btn primary" id="syncStart">Create a sync code</button></div>
+              <div class="sync-join" id="syncPairWrap">
+                <label for="syncInput">Have a code from your other device?</label>
+                <div class="sync-enter-row"><input type="text" id="syncInput" class="text-input" dir="ltr" autocomplete="off" placeholder="Enter sync code"><button class="timer-btn" id="syncPairBtn">Pair</button></div>
+              </div>
+            </div>
+            <div class="sync-connected hidden" id="syncBody">
+              <div class="sync-code-row" id="syncCodeRow"><code id="syncCode" dir="ltr"></code><button class="timer-btn hidden" id="syncCopy">Copy code</button></div>
+              <div class="sync-actions">
+                <button class="timer-btn" id="syncReveal" data-open="0">Show code</button>
+                <button class="danger-btn sync-unpair" id="syncUnpair">Stop syncing</button>
+              </div>
+              <div class="sync-qr hidden" id="syncQr"></div>
+            </div>
+          </div>
+          <div class="sync-log-card">
+            <div class="setting-label"><span>Sync log</span><span class="setting-sub">Helpful details if sync needs troubleshooting</span></div>
+            <div class="sync-controls settings-actions"><button class="timer-btn" id="viewLogBtn">View log</button><button class="timer-btn" id="copyLogBtn">Copy log</button></div>
+          </div>
+          <pre class="log-view hidden" id="syncLogView"></pre>
         </div>
-        <div class="sync-controls settings-actions">
-          <button class="timer-btn" id="viewLogBtn">View</button>
-          <button class="timer-btn" id="copyLogBtn">Copy log</button>
-        </div>
-      </div>
-      <pre class="log-view hidden" id="syncLogView"></pre>
+      </details>
 
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Backup</span>
-          <span class="setting-sub">Export or restore your data as JSON</span>
+      <details class="settings-group">
+        <summary><span class="settings-group-title">Backup and data</span><span class="settings-group-hint">Export, restore, or erase your data</span></summary>
+        <div class="settings-group-content">
+          <div class="setting-row">
+            <div class="setting-label"><span>Backup</span><span class="setting-sub">Export or restore your data as JSON</span></div>
+            <div class="backup-btns settings-actions"><button class="timer-btn" id="exportBtn">Export</button><button class="timer-btn" id="importBtn">Import</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label"><span>Data</span><span class="setting-sub data-description">Erase all tasks, notes and history</span></div>
+            <button class="danger-btn" id="resetDataBtn">Erase everything</button>
+          </div>
         </div>
-        <div class="backup-btns settings-actions">
-          <button class="timer-btn" id="exportBtn">Export</button>
-          <button class="timer-btn" id="importBtn">Import</button>
-          <input type="file" id="importFile" accept=".json,application/json" hidden>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-label">
-          <span>Data</span>
-          <span class="setting-sub data-description">Erase all tasks, notes and history</span>
-        </div>
-        <button class="danger-btn" id="resetDataBtn">Erase everything</button>
-      </div>
+      </details>
     </section>
   </main>
 </div>
