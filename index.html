@@ -172,8 +172,8 @@
       <div class="modal edit-modal" role="dialog" aria-modal="true" aria-label="Edit task">
         <button class="modal-close" id="editClose" title="Close">&#10005;</button>
         <h2 class="modal-title">Edit task</h2>
-        <input type="text" id="editText" dir="auto" maxlength="200" placeholder="Task text">
-        <div class="edit-row">
+        <textarea id="editText" dir="auto" maxlength="200" rows="2" placeholder="Task text"></textarea>
+        <div class="edit-row" id="editRow">
           <button class="timer-btn" id="editFocusBtn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L21.5 9.3l-4.75 4.4 1.16 6.63L12 17.13l-5.91 3.2 1.16-6.63L2.5 9.3l6.6-1.04z"/></svg>
             Set as focus

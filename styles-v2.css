@@ -2273,13 +2273,35 @@ html .carry-sheet {
 html .carry-sheet .carry-list { max-height: none; overflow: visible; padding: 8px 20px; min-height: 120px; }
 .carry-choice { display: flex; align-items: center; gap: 14px; padding: 18px 4px; cursor: pointer; border-bottom: 1px solid var(--border); }
 .carry-choice:last-child { border-bottom: 0; }
-.carry-choice input { width: 23px; height: 23px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
+.carry-selection { display: flex; align-items: flex-start; gap: 14px; min-width: 0; flex: 1; cursor: pointer; }
+.carry-choice input { width: 23px; height: 23px; margin: 2px 0 0; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
 .carry-choice-copy { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
 .carry-choice .carry-day { align-self: flex-start; background: var(--accent-soft); color: var(--text-dim); }
 .carry-choice .carry-text { font-size: 15px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.carry-edit { width: 40px; height: 40px; flex: 0 0 40px; border: 1px solid var(--border); border-radius: 11px; color: var(--text-dim); }
+.carry-edit:hover { color: var(--accent); background: var(--accent-soft); }
 .carry-sheet-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 18px 20px; background: var(--card-solid); border-top: 1px solid var(--border); }
 .carry-sheet-actions button { min-height: 48px; padding-inline: 18px; border-radius: 13px; }
 .carry-sheet-actions button:disabled { opacity: .4; cursor: default; }
+
+/* The task editor grows with its text and can be opened over the carry sheet. */
+#editModal { z-index: 180; }
+html .edit-modal { width: 100%; max-width: 680px; max-height: calc(var(--visible-height, 100vh) - 40px); overflow-y: auto; }
+html .edit-modal #editText {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  max-height: min(42vh, 320px);
+  height: auto;
+  resize: none;
+  overflow-y: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--text);
+}
+.task-text, .carry-choice .carry-text { white-space: pre-wrap; }
 @media (max-width: 720px) {
   .history-summary { flex-wrap: wrap; }
   .carry-header { font-size: 12px; }
@@ -2287,6 +2309,8 @@ html .carry-sheet .carry-list { max-height: none; overflow: visible; padding: 8p
   .carry-sheet-head { padding: 26px 20px 18px; }
   .carry-sheet-actions { padding-bottom: max(18px, env(safe-area-inset-bottom, 0px)); }
   .carry-sheet-actions button { flex: 1; padding-inline: 10px; font-size: 13px; }
+  html .edit-modal { width: 100%; max-width: none; max-height: var(--visible-height, 100dvh); }
+  html .edit-modal #editText { max-height: min(28dvh, 220px); }
 }
 
 /* Coordinated palettes for both light and dark appearance. */

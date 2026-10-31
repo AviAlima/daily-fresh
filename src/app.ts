@@ -14,6 +14,7 @@
   var selectedCarry = new Set<string>();
   var celebratingTasks: Record<string, number> = Object.create(null);
   var editId: string | null = null;
+  var editDayKey: string | null = null;
   var editOpenAt = 0;
   var toastTimer: number | null = null;
   var noteSaveTimer: number | null = null;
@@ -262,8 +263,9 @@
     }
   }
 
-  function editTask(id: string, text: string) {
-    var task = today().tasks.find(function (t) { return t.id === id; });
+  function editTask(id: string, text: string, dayKey?: string) {
+    var day = state.days[dayKey || activeDay];
+    var task = day && day.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     task.text = text.trim();
     save();
@@ -448,7 +450,8 @@
     carryList: $('carryList'),
     carryToggle: $('carryToggle'),
     editModal: $('editModal'),
-    editText: $<HTMLInputElement>('editText'),
+    editText: $<HTMLTextAreaElement>('editText'),
+    editRow: $('editRow'),
     editFocusBtn: $('editFocusBtn'),
     editPostponeBtn: $('editPostponeBtn'),
     editPostponeRow: $('editPostponeRow'),
@@ -844,9 +847,10 @@
     selectedCarry.forEach(function (key) { if (!available.has(key)) selectedCarry.delete(key); });
     els.carryList.innerHTML = candidates.map(function (c) {
       var key = carryKey(c.day, c.task.id);
-      return '<label class="carry-choice"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
+      return '<div class="carry-choice"><label class="carry-selection"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
         '<span class="carry-choice-copy"><span class="carry-day">' + dayLabel(c.day) + '</span>' +
-        '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span></span></label>';
+        '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span></span></label>' +
+        '<button type="button" class="icon-btn carry-edit" data-carry-edit="' + c.task.id + '" data-carry-day="' + c.day + '" aria-label="Edit task: ' + escapeHtml(c.task.text) + '" title="Edit task">' + pencilIcon() + '</button></div>';
     }).join('') || '<p class="carry-empty">Nothing waiting here. Unfinished tasks from previous days will appear here when you need them.</p>';
     updateCarrySelection();
   }
@@ -1148,17 +1152,30 @@
     setTimeout(function () { done = true; window.removeEventListener('click', kill, true); }, EDIT_GHOST_WINDOW_MS);
   }
 
-  function openEdit(id: string) {
-    var day = today();
+  function resizeEditText() {
+    els.editText.style.height = 'auto';
+    var maxHeight = parseFloat(window.getComputedStyle(els.editText).maxHeight) || Math.floor(window.innerHeight * 0.42);
+    var targetHeight = Math.min(els.editText.scrollHeight, maxHeight);
+    els.editText.style.height = targetHeight + 'px';
+    els.editText.style.overflowY = els.editText.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }
+
+  function openEdit(id: string, dayKey?: string) {
+    var key = dayKey || activeDay;
+    var day = state.days[key];
+    if (!day) return;
     var task = day.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     editId = id;
+    editDayKey = key;
     els.editText.value = task.text;
+    els.editRow.classList.toggle('hidden', key !== activeDay);
     els.editFocusBtn.textContent = day.focus === id ? 'Clear focus' : 'Set as focus';
     els.editPostponeRow.classList.add('hidden');
     els.editDate.value = '';
     showDialog('editModal');
     editOpenAt = Date.now();
+    resizeEditText();
     if (!isTouchScreen()) {
       els.editText.focus();
       els.editText.setSelectionRange(els.editText.value.length, els.editText.value.length);
@@ -1168,9 +1185,18 @@
   function closeEdit() {
     if (!editId) return;
     var closedId = editId;
+    var closedDayKey = editDayKey || activeDay;
     editId = null;
+    editDayKey = null;
     hideDialog('editModal');
     render();
+    if (closedDayKey !== activeDay) {
+      var carryEditButton = Array.from(els.carryList.querySelectorAll<HTMLElement>('[data-carry-edit]')).find(function (el) {
+        return el.dataset.carryEdit === closedId && el.dataset.carryDay === closedDayKey;
+      });
+      if (carryEditButton) carryEditButton.focus({ preventScroll: true });
+      return;
+    }
     var editButton = Array.from(els.taskList.querySelectorAll<HTMLElement>('[data-edit]')).find(function (el) { return el.dataset.edit === closedId; });
     if (editButton) editButton.focus({ preventScroll: true });
   }
@@ -1189,12 +1215,14 @@
   els.editSave.addEventListener('click', function () {
     if (!editId) return;
     var text = els.editText.value.trim();
-    if (text) { editTask(editId, text); closeEdit(); }
+    if (text) { editTask(editId, text, editDayKey || activeDay); closeEdit(); }
   });
   els.editText.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.isComposing) els.editSave.click();
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); els.editSave.click(); }
     if (e.key === 'Escape') closeEdit();
   });
+  els.editText.addEventListener('input', resizeEditText);
+  window.addEventListener('resize', function () { if (editId) resizeEditText(); });
   els.editFocusBtn.addEventListener('click', function () {
     if (!editId) return;
     toggleFocus(editId);
@@ -1227,6 +1255,15 @@
     var key = carryKey(input.dataset.carry || '', input.dataset.carryId || '');
     if (input.checked) selectedCarry.add(key); else selectedCarry.delete(key);
     updateCarrySelection();
+  });
+
+  els.carryList.addEventListener('click', function (e) {
+    var target = e.target as HTMLElement | null;
+    var button = target && target.closest<HTMLElement>('[data-carry-edit]');
+    if (!button) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openEdit(button.dataset.carryEdit || '', button.dataset.carryDay || '');
   });
 
   $('carrySelected').addEventListener('click', function () {
@@ -2125,10 +2162,10 @@
     toast('Welcome' + (name ? ', ' + name : '') + ' \u2014 a fresh page awaits');
   });
 
-  var dialogReturnFocus: HTMLElement | null = null;
+  var dialogReturnFocus: Record<string, HTMLElement | null> = Object.create(null);
 
   function showDialog(id: string) {
-    dialogReturnFocus = document.activeElement as HTMLElement | null;
+    dialogReturnFocus[id] = document.activeElement as HTMLElement | null;
     $(id).classList.remove('hidden');
     document.documentElement.classList.add('dialog-open');
     var first = $(id).querySelector<HTMLElement>(isTouchScreen() ? 'button' : 'input, button');
@@ -2137,8 +2174,10 @@
 
   function hideDialog(id: string) {
     $(id).classList.add('hidden');
-    document.documentElement.classList.remove('dialog-open');
-    if (dialogReturnFocus && dialogReturnFocus.isConnected) dialogReturnFocus.focus({ preventScroll: true });
+    if (!document.querySelector('.modal-backdrop:not(.hidden)')) document.documentElement.classList.remove('dialog-open');
+    var returnFocus = dialogReturnFocus[id];
+    delete dialogReturnFocus[id];
+    if (returnFocus && returnFocus.isConnected) returnFocus.focus({ preventScroll: true });
   }
 
   /* ================= Keyboard ================= */
