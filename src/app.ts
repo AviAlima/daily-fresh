@@ -1604,24 +1604,20 @@
     button.textContent = 'Updating…';
     dismissKeyboard();
     try {
-      if (navigator.serviceWorker) {
-        var registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
-          await Promise.race([registration.update(), new Promise<void>(function (resolve) { setTimeout(resolve, 5000); })]);
-          if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      await window.AppUpdates.refresh({
+        getRegistration: async function () {
+          return navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : undefined;
+        },
+        reload: function () {
+          var url = new URL(location.href);
+          url.searchParams.set('_refresh', String(Date.now()));
+          location.replace(url.toString());
         }
-      }
-      if (window.caches) {
-        var keys = await caches.keys();
-        await Promise.all(keys.filter(function (key) { return key.startsWith('daily-fresh-'); }).map(function (key) { return caches.delete(key); }));
-      }
-      var url = new URL(location.href);
-      url.searchParams.set('_refresh', String(Date.now()));
-      location.replace(url.toString());
+      });
     } catch (e) {
       button.disabled = false;
       button.textContent = 'Update';
-      toast('Could not check for updates. Try again when connected.');
+      toast('Could not refresh the app. Close it and open it again.');
     }
   });
 

@@ -76,6 +76,13 @@ interface LogicApi {
 }
 
 interface Window {
+  AppUpdates: {
+    refresh(options: {
+      getRegistration(): Promise<ServiceWorkerRegistration | undefined>;
+      reload(): void;
+      timeoutMs?: number;
+    }): Promise<void>;
+  };
   Sync: SyncApi;
   Logic: LogicApi;
   webkitAudioContext?: typeof AudioContext;

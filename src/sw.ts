@@ -8,6 +8,7 @@ const ASSETS = [
   './styles.css',
   './styles-v2.css',
   './dist/app.js',
+  './dist/update.js',
   './dist/sync.js',
   './dist/logic.js',
   './dist/firebase-config.js',
