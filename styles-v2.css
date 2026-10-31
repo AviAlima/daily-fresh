@@ -69,7 +69,7 @@ html[data-theme="light"] {
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; background: var(--bg); scroll-padding-block: 24px; }
 
 html, body { height: 100%; }
 
@@ -83,7 +83,7 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s, color 0.3s;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ---------- Aurora backdrop ---------- */
@@ -133,7 +133,7 @@ body::after {
 
 .hidden { display: none !important; }
 
-.app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+.app { display: flex; min-height: 100vh; min-height: 100svh; position: relative; z-index: 1; }
 
 /* ---------- Sidebar ---------- */
 .sidebar {
@@ -1981,6 +1981,8 @@ html[data-ui="dashboard"] .kbd-hint { display: none; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 720px) {
+  html { scroll-padding-top: calc(88px + env(safe-area-inset-top, 0px)); }
+
   .app { flex-direction: column; }
 
   #todayView { display: flex; flex-direction: column; }
@@ -1995,7 +1997,7 @@ html[data-ui="dashboard"] .kbd-hint { display: none; }
     align-items: center;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
     gap: 8px;
     background: rgba(10, 14, 22, 0.72);
     backdrop-filter: blur(20px);
@@ -2003,6 +2005,17 @@ html[data-ui="dashboard"] .kbd-hint { display: none; }
   }
 
   html[data-theme="light"] .sidebar { background: rgba(255, 255, 255, 0.75); }
+
+  /* Let content ease under the glass instead of meeting a hard divider. */
+  .sidebar::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 20px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    opacity: 0.65;
+  }
 
   .brand { padding: 0 8px 0 0; font-size: 15.5px; }
   .brand-dot { width: 9px; height: 9px; }
@@ -2020,7 +2033,7 @@ html[data-ui="dashboard"] .kbd-hint { display: none; }
   .nav-btn.active::before { display: none; }
   .version-tag { display: none; }
 
-  .main { padding: 16px 18px calc(30px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
+  .main { padding: 24px 18px calc(64px + env(safe-area-inset-bottom, 0px) + var(--kbd-space, 0px)); }
 
   #taskInput,
   .text-input,

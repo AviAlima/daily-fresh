@@ -45,7 +45,7 @@ html[data-theme="light"] {
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: clip; background: var(--bg); scroll-padding-block: 24px; }
 
 html, body { height: 100%; }
 
@@ -61,12 +61,12 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s, color 0.3s;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .hidden { display: none !important; }
 
-.app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+.app { display: flex; min-height: 100vh; min-height: 100svh; position: relative; z-index: 1; }
 
 /* ---------- Sidebar ---------- */
 .sidebar {

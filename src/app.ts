@@ -544,7 +544,7 @@
     }
     document.documentElement.setAttribute('data-theme', resolved);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', resolved === 'dark' ? '#151a21' : '#f4f5f8');
+    if (meta) meta.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
   }
 
   if (window.matchMedia) {
@@ -1253,6 +1253,7 @@
     document.documentElement.dataset.ui = m;
     var link = document.getElementById('v2css') as HTMLLinkElement | null;
     if (link) link.disabled = m === 'classic';
+    applyTheme();
     els.uiZenBtn.classList.toggle('active', m === 'zen');
     els.uiFocusBtn.classList.toggle('active', m === 'focus');
     els.uiDashBtn.classList.toggle('active', m === 'dashboard');
