@@ -284,8 +284,14 @@
       </div>
 
       <div class="setting-row icon-setting">
+        <div class="setting-label"><span>Home Screen icon</span><span class="setting-sub">Choose the icon for a new Home Screen shortcut</span></div>
+        <div class="icon-quick-picker" id="homeIconPicker" role="group" aria-label="Home Screen icon"></div>
+        <button class="icon-setup-link" id="homeIconSetup">How to add the chosen icon ↗</button>
+      </div>
+
+      <div class="setting-row icon-setting">
         <div class="setting-label"><span>Unfinished tasks icon</span><span class="setting-sub">Your shortcut to tasks from previous days</span></div>
-        <div class="carry-icon-picker" id="carryIconPicker" role="group" aria-label="Unfinished tasks icon"></div>
+        <div class="icon-quick-picker" id="carryIconPicker" role="group" aria-label="Unfinished tasks icon"></div>
       </div>
 
       <div class="setting-row">
@@ -390,6 +396,41 @@
       </div>
     </section>
   </main>
+</div>
+
+<div class="modal-backdrop hidden" id="carryIconModal">
+  <div class="modal icon-choice-modal" role="dialog" aria-modal="true" aria-labelledby="carryIconTitle">
+    <button class="modal-close" id="carryIconClose" aria-label="Close">&times;</button>
+    <h2 id="carryIconTitle">Unfinished tasks icon</h2>
+    <p>A small shortcut to pick up where you left off.</p>
+    <div class="carry-icon-picker" id="allCarryIcons" role="group" aria-label="All unfinished tasks icons"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="homeIconModal">
+  <div class="modal icon-choice-modal" role="dialog" aria-modal="true" aria-labelledby="homeIconTitle">
+    <button class="modal-close" id="homeIconClose" aria-label="Close">&times;</button>
+    <h2 id="homeIconTitle">A fresh face for your Home Screen</h2>
+    <p>Choose a design, then follow the setup steps. Your existing icon stays as it is.</p>
+    <div class="home-icon-grid" id="allHomeIcons" role="group" aria-label="All Home Screen icons"></div>
+    <button class="primary-big" id="homeIconContinue">Use chosen icon</button>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="homeIconSetupModal">
+  <div class="modal icon-choice-modal" role="dialog" aria-modal="true" aria-labelledby="homeSetupTitle">
+    <button class="modal-close" id="homeSetupClose" aria-label="Close">&times;</button>
+    <div class="home-icon-preview"><img id="homeIconPreview" width="76" height="76" alt="Chosen Home Screen icon"><div><h2 id="homeSetupTitle">Add your chosen icon</h2><span id="homeIconName"></span></div></div>
+    <ol class="home-icon-steps">
+      <li>Copy the setup link and open it in <strong>Safari</strong>.</li>
+      <li>Tap <strong>Share → Add to Home Screen</strong>.</li>
+      <li>Keep <strong>Open as Web App</strong> enabled if shown, then tap <strong>Add</strong>.</li>
+    </ol>
+    <p class="home-icon-note">This adds a new shortcut; it cannot replace an existing icon automatically. Keep your current app until you have checked your tasks in the new one.</p>
+    <input id="homeSetupUrl" class="home-setup-url" aria-label="Safari setup link" readonly>
+    <button class="primary-big" id="homeCopyLink">Copy Safari setup link</button>
+    <div class="home-icon-links"><a id="homeSetupOpen" target="_blank" rel="noopener">Open setup page ↗</a><a id="homeIconDownload" download>Download icon</a></div>
+  </div>
 </div>
 
 <div class="modal-backdrop hidden" id="carryModal">

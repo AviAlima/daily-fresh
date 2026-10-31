@@ -1305,23 +1305,88 @@
   function carryIconSvg(paths: string): string {
     return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
   }
+  function carryChoiceButton(icon: typeof carryIcons[number], chosen: string): string {
+    return '<button class="carry-icon-option" data-carry-icon="' + icon.key + '" aria-pressed="' + (chosen === icon.key) + '">' + carryIconSvg(icon.paths) + '<span>' + icon.label + '</span></button>';
+  }
   function applyCarryIcon(key: string) {
     var chosen = carryIcons.find(function (icon) { return icon.key === key; }) || carryIcons[0];
     $('carryIcon').innerHTML = carryIconSvg(chosen.paths);
-    document.querySelectorAll<HTMLElement>('[data-carry-icon]').forEach(function (button) {
-      button.setAttribute('aria-pressed', String(button.dataset.carryIcon === chosen.key));
-    });
+    var quick = carryIcons.slice(0, 3);
+    if (!quick.some(function (icon) { return icon.key === chosen.key; })) quick[2] = chosen;
+    $('carryIconPicker').innerHTML = quick.map(function (icon) { return carryChoiceButton(icon, chosen.key); }).join('') + '<button class="icon-more" id="moreCarryIcons" aria-haspopup="dialog" aria-controls="carryIconModal"><span aria-hidden="true">···</span>More</button>';
+    $('allCarryIcons').innerHTML = carryIcons.map(function (icon) { return carryChoiceButton(icon, chosen.key); }).join('');
   }
-  $('carryIconPicker').innerHTML = carryIcons.map(function (icon) {
-    return '<button class="carry-icon-option" data-carry-icon="' + icon.key + '" aria-pressed="false">' + carryIconSvg(icon.paths) + '<span>' + icon.label + '</span></button>';
-  }).join('');
   try { applyCarryIcon(localStorage.getItem('daily-fresh-carry-icon') || 'history'); } catch (e) { applyCarryIcon('history'); }
-  $('carryIconPicker').addEventListener('click', function (e) {
-    var button = (e.target as HTMLElement).closest<HTMLElement>('[data-carry-icon]');
+  function chooseCarryIcon(e: Event) {
+    var target = e.target as HTMLElement;
+    if (target.closest('#moreCarryIcons')) { showDialog('carryIconModal'); return; }
+    var button = target.closest<HTMLElement>('[data-carry-icon]');
     if (!button) return;
     var key = button.dataset.carryIcon || 'history';
+    var fromDialog = !!button.closest('#carryIconModal');
+    if (fromDialog) hideDialog('carryIconModal');
     applyCarryIcon(key);
+    var selected = $('carryIconPicker').querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (selected) selected.focus({ preventScroll: true });
     try { localStorage.setItem('daily-fresh-carry-icon', key); } catch (e) {}
+  }
+  $('carryIconPicker').addEventListener('click', chooseCarryIcon);
+  $('allCarryIcons').addEventListener('click', chooseCarryIcon);
+
+  const homeIcons = [
+    { key: 'leaf', label: 'Fresh' }, { key: 'check', label: 'Check' },
+    { key: 'sunrise', label: 'Sunrise' }, { key: 'orbit', label: 'Orbit' },
+    { key: 'bloom', label: 'Bloom' }, { key: 'spark', label: 'Spark' },
+    { key: 'pages', label: 'Pages' }, { key: 'focus', label: 'Focus' }
+  ];
+  var chosenHomeIcon = 'leaf';
+  function homeChoiceButton(icon: typeof homeIcons[number]): string {
+    return '<button class="home-icon-option" data-home-icon="' + icon.key + '" aria-pressed="' + (chosenHomeIcon === icon.key) + '"><img src="icons/home/' + icon.key + '-180.png" width="44" height="44" alt=""><span>' + icon.label + '</span></button>';
+  }
+  function applyHomeIcon(key: string) {
+    var chosen = homeIcons.find(function (icon) { return icon.key === key; }) || homeIcons[0];
+    chosenHomeIcon = chosen.key;
+    var quick = homeIcons.slice(0, 3);
+    if (!quick.some(function (icon) { return icon.key === chosen.key; })) quick[2] = chosen;
+    $('homeIconPicker').innerHTML = quick.map(homeChoiceButton).join('') + '<button class="icon-more" id="moreHomeIcons" aria-haspopup="dialog" aria-controls="homeIconModal"><span aria-hidden="true">···</span>More</button>';
+    $('allHomeIcons').innerHTML = homeIcons.map(homeChoiceButton).join('');
+    ($('homeIconPreview') as HTMLImageElement).src = 'icons/home/' + chosen.key + '-180.png';
+    $('homeIconName').textContent = chosen.label;
+    var url = new URL('install/' + chosen.key + '.html', new URL('./', location.href)).href;
+    ($('homeSetupUrl') as HTMLInputElement).value = url;
+    ($('homeSetupOpen') as HTMLAnchorElement).href = url;
+    ($('homeIconDownload') as HTMLAnchorElement).href = 'icons/home/' + chosen.key + '-512.png';
+  }
+  try { applyHomeIcon(localStorage.getItem('daily-fresh-home-icon') || 'leaf'); } catch (e) { applyHomeIcon('leaf'); }
+  function chooseHomeIcon(e: Event) {
+    var target = e.target as HTMLElement;
+    if (target.closest('#moreHomeIcons')) { showDialog('homeIconModal'); return; }
+    var button = target.closest<HTMLElement>('[data-home-icon]');
+    if (!button) return;
+    var fromDialog = !!button.closest('#homeIconModal');
+    var key = button.dataset.homeIcon || 'leaf';
+    var focusedIndex = Array.from($('allHomeIcons').children).indexOf(button);
+    applyHomeIcon(key);
+    var chosen = fromDialog ? $('allHomeIcons').children[focusedIndex] : $('homeIconPicker').querySelector('[aria-pressed="true"]');
+    if (chosen) (chosen as HTMLElement).focus({ preventScroll: true });
+    try { localStorage.setItem('daily-fresh-home-icon', chosenHomeIcon); } catch (e) {}
+  }
+  $('homeIconPicker').addEventListener('click', chooseHomeIcon);
+  $('allHomeIcons').addEventListener('click', chooseHomeIcon);
+  $('homeIconSetup').addEventListener('click', function () { showDialog('homeIconSetupModal'); });
+  $('homeIconContinue').addEventListener('click', function () { hideDialog('homeIconModal'); showDialog('homeIconSetupModal'); });
+  $('homeCopyLink').addEventListener('click', function () {
+    var input = $('homeSetupUrl') as HTMLInputElement;
+    if (navigator.clipboard) navigator.clipboard.writeText(input.value).then(function () { toast('Link copied — paste it in Safari'); }).catch(function () { input.focus(); input.select(); });
+    else { input.focus(); input.select(); }
+  });
+  [
+    { modal: 'carryIconModal', close: 'carryIconClose' },
+    { modal: 'homeIconModal', close: 'homeIconClose' },
+    { modal: 'homeIconSetupModal', close: 'homeSetupClose' }
+  ].forEach(function (item) {
+    $(item.close).addEventListener('click', function () { hideDialog(item.modal); });
+    $(item.modal).addEventListener('click', function (e) { if (e.target === $(item.modal)) hideDialog(item.modal); });
   });
 
   function updateHeroIcon() {
@@ -2040,6 +2105,7 @@
         else if (dialog.id === 'focusModal') closeFocusModal();
         else if (dialog.id === 'eraseModal') closeEraseModal();
         else if (dialog.id === 'carryModal') closeCarry();
+        else if (['carryIconModal', 'homeIconModal', 'homeIconSetupModal'].includes(dialog.id)) hideDialog(dialog.id);
       }
       if (e.key === 'Tab') {
         var controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea, select, [tabindex="0"]')).filter(function (el) { return el.getClientRects().length > 0; });

@@ -2334,3 +2334,33 @@ html #carryToggle { width: 44px; height: 44px; position: relative; border: 1px s
   html .app { padding-top: calc(65px + env(safe-area-inset-top, 0px)); }
   html .top-right { gap: 10px; }
 }
+
+/* Keep icon preferences to a single row; the full collections open on demand. */
+.icon-quick-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.icon-quick-picker .carry-icon-option { padding: 12px 4px; }
+.icon-more { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px 4px; border: 1px dashed var(--border-hi); border-radius: 12px; color: var(--text-dim); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.icon-more > span { font-size: 24px; line-height: 20px; letter-spacing: 2px; }
+.icon-choice-modal { padding: 28px 24px; max-width: 480px; }
+.icon-choice-modal h2 { font-size: 23px; letter-spacing: -.04em; line-height: 1.2; padding-right: 24px; }
+.icon-choice-modal > p { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 12px 0 20px; }
+.home-icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.home-icon-option { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-soft); color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 4px; font-family: inherit; font-size: 11px; cursor: pointer; }
+.home-icon-option img { border-radius: 11px; display: block; }
+.home-icon-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.icon-setup-link { color: var(--accent); font-family: inherit; font-size: 12px; background: none; border: none; padding: 4px 0; cursor: pointer; text-align: left; min-height: 32px; }
+.home-icon-preview { display: flex; align-items: center; gap: 16px; }
+.home-icon-preview img { border-radius: 18px; }
+.home-icon-preview h2 { font-size: 21px; }
+#homeIconName { display: block; color: var(--text-dim); font-size: 13px; margin-top: 6px; }
+.home-icon-steps { padding-left: 20px; margin: 24px 0 20px; font-size: 14px; line-height: 1.7; color: var(--text-dim); }
+.home-icon-steps li + li { margin-top: 12px; }
+.home-icon-steps strong { color: var(--text); }
+.home-icon-note { font-size: 12px !important; }
+.home-setup-url { width: 100%; padding: 12px; border-radius: 10px; background: var(--bg-soft); color: var(--text-dim); border: 1px solid var(--border); font-family: inherit; }
+.home-icon-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.home-icon-links a { font-size: 12px; color: var(--accent); text-decoration: none; padding-block: 8px; }
+@media (max-width: 720px) {
+  html .icon-choice-modal { padding: 26px 20px; }
+  .icon-choice-modal .carry-icon-picker { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .icon-choice-modal .carry-icon-option { font-size: 9px; }
+}

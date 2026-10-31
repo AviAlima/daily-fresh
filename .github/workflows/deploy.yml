@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/site"
           cp index.html styles.css styles-v2.css manifest.json "$RUNNER_TEMP/site/"
-          cp -r dist icons vendor "$RUNNER_TEMP/site/"
+          cp -r dist icons vendor install "$RUNNER_TEMP/site/"
           touch "$RUNNER_TEMP/site/.nojekyll"
 
       - name: Upload artifact

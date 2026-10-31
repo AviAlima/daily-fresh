@@ -19,7 +19,32 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
-  './icons/icon-180.png'
+  './icons/icon-180.png',
+  './install/install.css',
+  './install/leaf.html',
+  './icons/home/leaf-180.png',
+  './icons/home/leaf-512.png',
+  './install/check.html',
+  './icons/home/check-180.png',
+  './icons/home/check-512.png',
+  './install/sunrise.html',
+  './icons/home/sunrise-180.png',
+  './icons/home/sunrise-512.png',
+  './install/orbit.html',
+  './icons/home/orbit-180.png',
+  './icons/home/orbit-512.png',
+  './install/bloom.html',
+  './icons/home/bloom-180.png',
+  './icons/home/bloom-512.png',
+  './install/spark.html',
+  './icons/home/spark-180.png',
+  './icons/home/spark-512.png',
+  './install/pages.html',
+  './icons/home/pages-180.png',
+  './icons/home/pages-512.png',
+  './install/focus.html',
+  './icons/home/focus-180.png',
+  './icons/home/focus-512.png'
 ];
 
 sw.addEventListener('install', (e) => {
