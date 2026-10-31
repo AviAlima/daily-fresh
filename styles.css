@@ -1586,6 +1586,8 @@ html[data-theme="light"] .est-chip { background: rgba(15, 23, 42, 0.05); }
 }
 
 /* Shared interaction refinements across all interfaces. */
+.update-controls { display: flex; align-items: center; gap: 12px; }
+.update-version { color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 html.dialog-open { overflow: hidden; }
 html .modal { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
 html .setting-sub { line-height: 1.5; }

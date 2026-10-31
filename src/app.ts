@@ -2199,6 +2199,7 @@
   updateInstallRow();
   var versionEl = $('appVersion');
   if (versionEl) versionEl.textContent = APP_VERSION;
+  $('updateVersion').textContent = APP_VERSION;
   if (!state.onboarded) openOnboarding();
   else if (!isTouchScreen()) focusTaskInput();
   if (window.Sync) {
