@@ -19,12 +19,13 @@
 <link rel="stylesheet" href="styles-v2.css" id="v2css">
 <script>
 (function () {
+  document.documentElement.dataset.ui = 'zen';
   try {
-    var mode = localStorage.getItem('daily-fresh-ui') || 'v2';
-    document.documentElement.dataset.ui = mode;
-    var l = document.getElementById('v2css');
-    if (l && mode === 'classic') l.disabled = true;
-  } catch (e) { document.documentElement.dataset.ui = 'v2'; }
+    var compact = localStorage.getItem('daily-fresh-compact');
+    if (compact === null) compact = localStorage.getItem('daily-fresh-ui') === 'focus' ? 'true' : 'false';
+    document.documentElement.dataset.compact = compact;
+    document.documentElement.dataset.palette = localStorage.getItem('daily-fresh-palette') || 'forest';
+  } catch (e) {}
 })();
 </script>
 </head>
@@ -82,7 +83,6 @@
       </div>
     </header>
 
-    <div class="dash-strip" id="dashStrip"></div>
 
     <section class="view" id="todayView">
       <div class="day-overview" aria-label="Today's progress">
@@ -116,13 +116,11 @@
       </div>
 
       <div class="carry hidden" id="carryWrap">
-        <div class="carry-header" id="carryToggle">
-          <span class="chevron">&#9654;</span>
-          Unfinished from previous days
+        <button class="carry-header" id="carryToggle" aria-haspopup="dialog" aria-controls="carryModal">
+          <span>Unfinished from previous days</span>
           <span class="carry-count" id="carryCount"></span>
-          <button class="carry-all" id="carryAll">Bring all</button>
-        </div>
-        <div class="carry-list" id="carryList"></div>
+          <span aria-hidden="true">↗</span>
+        </button>
       </div>
 
       <div class="list-head" id="listHead">
@@ -196,6 +194,7 @@
 
     <section class="view hidden" id="historyView">
       <h2 class="view-title">History</h2>
+      <div class="dash-strip history-summary" id="dashStrip" aria-label="Weekly summary"></div>
 
       <div class="stats-row">
         <div class="stat-card">
@@ -276,17 +275,25 @@
         </select>
       </div>
 
+      <div class="setting-row palette-setting">
+        <div class="setting-label"><span>Color palette</span><span class="setting-sub">Choose your atmosphere</span></div>
+        <div class="palette-picker" role="group" aria-label="Color palette">
+          <button class="palette-option" data-palette="forest" aria-pressed="true"><span class="palette-swatches" aria-hidden="true"><i style="background:#101c20"></i><i style="background:#a4dfbd"></i><i style="background:#d5e7ad"></i></span>Forest</button>
+          <button class="palette-option" data-palette="ocean" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#121f32"></i><i style="background:#9fc9ef"></i><i style="background:#e2d4b1"></i></span>Ocean</button>
+          <button class="palette-option" data-palette="plum" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#251c2b"></i><i style="background:#d5b2e0"></i><i style="background:#e8c4c4"></i></span>Plum</button>
+          <button class="palette-option" data-palette="clay" aria-pressed="false"><span class="palette-swatches" aria-hidden="true"><i style="background:#29211e"></i><i style="background:#e6b59c"></i><i style="background:#d4c89e"></i></span>Clay</button>
+        </div>
+      </div>
+
       <div class="setting-row">
         <div class="setting-label">
-          <span>Interface</span>
-          <span class="setting-sub">Look and layout</span>
+          <label for="compactToggle">Minimal view</label>
+          <span class="setting-sub">Hide the daily overview and focus on your tasks</span>
         </div>
-        <div class="seg" id="uiSeg">
-          <button class="timer-btn" id="uiZenBtn">Zen</button>
-          <button class="timer-btn" id="uiFocusBtn">Focus</button>
-          <button class="timer-btn" id="uiDashBtn">Dash</button>
-          <button class="timer-btn" id="uiClassicBtn">Classic</button>
-        </div>
+        <label class="switch">
+          <input type="checkbox" id="compactToggle">
+          <span class="slider"></span>
+        </label>
       </div>
 
       <div class="setting-row">
@@ -352,7 +359,7 @@
           <span>Sync log</span>
           <span class="setting-sub">Last sync events — copy to share diagnostics</span>
         </div>
-        <div class="sync-controls">
+        <div class="sync-controls settings-actions">
           <button class="timer-btn" id="viewLogBtn">View</button>
           <button class="timer-btn" id="copyLogBtn">Copy log</button>
         </div>
@@ -364,7 +371,7 @@
           <span>Backup</span>
           <span class="setting-sub">Export or restore your data as JSON</span>
         </div>
-        <div class="backup-btns">
+        <div class="backup-btns settings-actions">
           <button class="timer-btn" id="exportBtn">Export</button>
           <button class="timer-btn" id="importBtn">Import</button>
           <input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -374,12 +381,27 @@
       <div class="setting-row">
         <div class="setting-label">
           <span>Data</span>
-          <span class="setting-sub">Erase all tasks, notes and history</span>
+          <span class="setting-sub data-description">Erase all tasks, notes and history</span>
         </div>
         <button class="danger-btn" id="resetDataBtn">Erase everything</button>
       </div>
     </section>
   </main>
+</div>
+
+<div class="modal-backdrop hidden" id="carryModal">
+  <div class="modal carry-sheet" role="dialog" aria-modal="true" aria-labelledby="carryTitle">
+    <div class="carry-sheet-head">
+      <button class="modal-close" id="carryClose" aria-label="Close">&times;</button>
+      <h2 id="carryTitle">A fresh start for unfinished tasks</h2>
+      <p>Choose what matters today. The rest stays in your history.</p>
+    </div>
+    <div class="carry-list" id="carryList"></div>
+    <div class="carry-sheet-actions">
+      <button class="timer-btn" id="carryAll">Bring all</button>
+      <button class="timer-btn primary" id="carrySelected" disabled>Add selected</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-backdrop hidden" id="focusModal">

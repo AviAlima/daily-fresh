@@ -11,7 +11,7 @@
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
   var doneOpen = false;
-  var carryOpen = false;
+  var selectedCarry = new Set<string>();
   var editId: string | null = null;
   var editOpenAt = 0;
   var toastTimer: number | null = null;
@@ -279,7 +279,7 @@
       if (!silent) toast('Already in today');
       return;
     }
-    pushUndo();
+    if (!silent) pushUndo();
     var t: TaskShape = {
       id: uid(),
       text: task.text,
@@ -439,10 +439,6 @@
     themeSelect: $<HTMLSelectElement>('themeSelect'),
     soundToggle: $<HTMLInputElement>('soundToggle'),
     nameInput: $<HTMLInputElement>('nameInput'),
-    uiZenBtn: $<HTMLButtonElement>('uiZenBtn'),
-    uiFocusBtn: $<HTMLButtonElement>('uiFocusBtn'),
-    uiDashBtn: $<HTMLButtonElement>('uiDashBtn'),
-    uiClassicBtn: $<HTMLButtonElement>('uiClassicBtn'),
     dashStrip: $('dashStrip'),
     notesToggle: $<HTMLButtonElement>('notesToggle'),
     exportBtn: $<HTMLButtonElement>('exportBtn'),
@@ -672,11 +668,13 @@
       }
     }
     var code = window.Sync.getCode();
+    var codeChanged = els.syncCode.textContent !== code;
     var revealed = els.syncReveal.dataset.open === '1';
-    els.syncCode.textContent = revealed ? code : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    els.syncCode.textContent = revealed ? code : '';
+    els.syncCode.classList.toggle('hidden', !revealed);
     els.syncCopy.classList.toggle('hidden', !revealed);
     els.syncQr.classList.toggle('hidden', !revealed);
-    if (revealed && els.syncCode.textContent !== code) {
+    if (revealed && (codeChanged || !els.syncQr.hasChildNodes())) {
       renderQr(code);
     }
   }
@@ -772,21 +770,33 @@
     els.focusTaskText.textContent = task.text;
   }
 
+  function carryKey(day: string, id: string) { return day + '/' + id; }
+
+  function updateCarrySelection() {
+    var button = $('carrySelected') as HTMLButtonElement;
+    button.disabled = selectedCarry.size === 0;
+    button.textContent = selectedCarry.size ? 'Add selected (' + selectedCarry.size + ')' : 'Add selected';
+  }
+
   function renderCarry() {
     var candidates = carryCandidates();
     els.carryWrap.classList.toggle('hidden', candidates.length === 0);
-    if (!candidates.length) return;
     els.carryCount.textContent = String(candidates.length);
+    var available = new Set(candidates.map(function (c) { return carryKey(c.day, c.task.id); }));
+    selectedCarry.forEach(function (key) { if (!available.has(key)) selectedCarry.delete(key); });
     els.carryList.innerHTML = candidates.map(function (c) {
-      return (
-        '<button class="carry-item" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '">' +
-        '<span class="carry-day">' + dayLabel(c.day) + '</span>' +
-        '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span>' +
-        '</button>'
-      );
+      var key = carryKey(c.day, c.task.id);
+      return '<label class="carry-choice"><input type="checkbox" data-carry="' + c.day + '" data-carry-id="' + c.task.id + '"' + (selectedCarry.has(key) ? ' checked' : '') + '>' +
+        '<span class="carry-choice-copy"><span class="carry-day">' + dayLabel(c.day) + '</span>' +
+        '<span class="carry-text" dir="auto">' + escapeHtml(c.task.text) + '</span></span></label>';
     }).join('');
-    els.carryList.style.display = carryOpen ? '' : 'none';
-    els.carryToggle.classList.toggle('open', carryOpen);
+    updateCarrySelection();
+    if (!candidates.length && !$('carryModal').classList.contains('hidden')) closeCarry();
+  }
+
+  function closeCarry() {
+    hideDialog('carryModal');
+    if (els.carryWrap.classList.contains('hidden')) $('addBtn').focus({ preventScroll: true });
   }
 
   function renderNote() {
@@ -1056,9 +1066,13 @@
   els.doneList.addEventListener('click', onTaskClick);
 
   els.carryToggle.addEventListener('click', function () {
-    carryOpen = !carryOpen;
-    els.carryList.style.display = carryOpen ? '' : 'none';
-    els.carryToggle.classList.toggle('open', carryOpen);
+    selectedCarry.clear();
+    renderCarry();
+    if (carryCandidates().length) showDialog('carryModal');
+  });
+  $('carryClose').addEventListener('click', closeCarry);
+  $('carryModal').addEventListener('click', function (e) {
+    if (e.target === $('carryModal')) closeCarry();
   });
 
   /* ================= Edit modal ================= */
@@ -1151,21 +1165,26 @@
     removeTask(id);
   });
 
-  els.carryList.addEventListener('click', function (e) {
-    var t = e.target as HTMLElement | null;
-    if (!t) return;
-    var btn = t.closest<HTMLElement>('[data-carry]') as HTMLElement;
-    if (!btn) return;
-    var dayKey = btn.dataset.carry || '';
-    var day = state.days[dayKey];
-    if (day) {
-      var task = day.tasks.find(function (t) { return t.id === btn.dataset.carryId; });
-      if (task) carryTask(dayKey, task);
-    }
+  els.carryList.addEventListener('change', function (e) {
+    var input = e.target as HTMLInputElement;
+    if (!input.matches('input[data-carry]')) return;
+    var key = carryKey(input.dataset.carry || '', input.dataset.carryId || '');
+    if (input.checked) selectedCarry.add(key); else selectedCarry.delete(key);
+    updateCarrySelection();
   });
 
-  $('carryAll').addEventListener('click', function (e) {
-    e.stopPropagation();
+  $('carrySelected').addEventListener('click', function () {
+    var chosen = carryCandidates().filter(function (c) { return selectedCarry.has(carryKey(c.day, c.task.id)); });
+    if (!chosen.length) return;
+    pushUndo();
+    closeCarry();
+    chosen.forEach(function (c) { carryTask(c.day, c.task, true); });
+    selectedCarry.clear();
+    toast(chosen.length + (chosen.length === 1 ? ' task added to today' : ' tasks added to today'), { label: 'Undo', fn: doUndo });
+  });
+
+  $('carryAll').addEventListener('click', function () {
+    closeCarry();
     carryAll();
   });
 
@@ -1252,27 +1271,17 @@
     toast('Theme updated');
   });
 
-  /* ================= Interface (Zen / Focus / Dashboard / Classic) ================= */
+  /* ================= Appearance ================= */
 
-  var UI_KEY = 'daily-fresh-ui';
-  var UI_MODES = ['zen', 'focus', 'dashboard', 'classic'];
-
-  function normalizeUi(v: string | null): string {
-    if (v === 'classic' || v === 'focus' || v === 'dashboard') return v;
-    return 'zen';
-  }
-
-  function applyUi(mode: string) {
-    var m = normalizeUi(mode);
-    document.documentElement.dataset.ui = m;
-    var link = document.getElementById('v2css') as HTMLLinkElement | null;
-    if (link) link.disabled = m === 'classic';
-    applyTheme();
-    els.uiZenBtn.classList.toggle('active', m === 'zen');
-    els.uiFocusBtn.classList.toggle('active', m === 'focus');
-    els.uiDashBtn.classList.toggle('active', m === 'dashboard');
-    els.uiClassicBtn.classList.toggle('active', m === 'classic');
-    els.dashStrip.classList.toggle('hidden', m !== 'dashboard');
+  function applyAppearance() {
+    document.documentElement.dataset.ui = 'zen';
+    var compact = false;
+    try {
+      var saved = localStorage.getItem('daily-fresh-compact');
+      compact = saved === null ? localStorage.getItem('daily-fresh-ui') === 'focus' : saved === 'true';
+    } catch (e) {}
+    document.documentElement.dataset.compact = String(compact);
+    ($('compactToggle') as HTMLInputElement).checked = compact;
   }
 
   function updateHeroIcon() {
@@ -1293,18 +1302,29 @@
     els.notesToggle.setAttribute('aria-expanded', String(open));
   });
 
-  try { applyUi(normalizeUi(localStorage.getItem(UI_KEY))); } catch (e) { applyUi('zen'); }
-
-  function setUi(mode: string) {
-    try { localStorage.setItem(UI_KEY, mode); } catch (e) {}
-    applyUi(mode);
-    toast(mode === 'classic' ? 'Classic look' : mode === 'focus' ? 'Focus layout' : mode === 'dashboard' ? 'Dashboard layout' : 'Zen layout');
+  applyAppearance();
+  function applyPalette(palette: string) {
+    var valid = ['forest', 'ocean', 'plum', 'clay'];
+    var chosen = valid.includes(palette) ? palette : 'forest';
+    document.documentElement.dataset.palette = chosen;
+    document.querySelectorAll<HTMLElement>('[data-palette].palette-option').forEach(function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.palette === chosen));
+    });
+    applyTheme();
   }
-
-  els.uiZenBtn.addEventListener('click', function () { setUi('zen'); });
-  els.uiFocusBtn.addEventListener('click', function () { setUi('focus'); });
-  els.uiDashBtn.addEventListener('click', function () { setUi('dashboard'); });
-  els.uiClassicBtn.addEventListener('click', function () { setUi('classic'); });
+  try { applyPalette(localStorage.getItem('daily-fresh-palette') || 'forest'); } catch (e) { applyPalette('forest'); }
+  document.querySelectorAll<HTMLElement>('[data-palette].palette-option').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var palette = button.dataset.palette || 'forest';
+      applyPalette(palette);
+      try { localStorage.setItem('daily-fresh-palette', palette); } catch (e) {}
+    });
+  });
+  $('compactToggle').addEventListener('change', function () {
+    var compact = ($('compactToggle') as HTMLInputElement).checked;
+    document.documentElement.dataset.compact = String(compact);
+    try { localStorage.setItem('daily-fresh-compact', String(compact)); } catch (e) {}
+  });
 
   els.soundToggle.addEventListener('change', function () {
     state.settings.sound = els.soundToggle.checked;
@@ -1978,6 +1998,7 @@
         if (dialog.id === 'editModal') closeEdit();
         else if (dialog.id === 'focusModal') closeFocusModal();
         else if (dialog.id === 'eraseModal') closeEraseModal();
+        else if (dialog.id === 'carryModal') closeCarry();
       }
       if (e.key === 'Tab') {
         var controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea, select, [tabindex="0"]')).filter(function (el) { return el.getClientRects().length > 0; });
