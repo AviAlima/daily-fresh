@@ -1636,6 +1636,7 @@
         reload: function () {
           var url = new URL(location.href);
           url.searchParams.set('_refresh', String(Date.now()));
+          url.searchParams.set('_returnTo', 'update');
           location.replace(url.toString());
         }
       });
@@ -2300,9 +2301,12 @@
 
   /* ================= Boot ================= */
 
-  if (new URL(location.href).searchParams.has('_refresh')) {
-    var cleanUrl = new URL(location.href);
+  var bootUrl = new URL(location.href);
+  var returnToUpdate = bootUrl.searchParams.get('_returnTo') === 'update';
+  if (bootUrl.searchParams.has('_refresh')) {
+    var cleanUrl = bootUrl;
     cleanUrl.searchParams.delete('_refresh');
+    cleanUrl.searchParams.delete('_returnTo');
     history.replaceState(null, '', cleanUrl.toString());
   }
 
@@ -2316,7 +2320,12 @@
   applyTheme();
   ensureDay(true);
   render();
-  switchView('today');
+  switchView(returnToUpdate ? 'settings' : 'today');
+  if (returnToUpdate) {
+    requestAnimationFrame(function () {
+      $('updateRow').scrollIntoView({ block: 'center', behavior: 'instant' });
+    });
+  }
   updateInstallRow();
   var versionEl = $('appVersion');
   if (versionEl) versionEl.textContent = APP_VERSION;
