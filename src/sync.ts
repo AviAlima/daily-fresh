@@ -560,7 +560,7 @@ function dedupeDay(tasks: TaskShape[], days: Record<string, DayShape>): { tasks:
   return Logic.dedupeDay(tasks, days, '');
 }
 
-function applyRemote(): void {
+function applyRemote(confirmedPush = false): void {
   const state = readLocal();
   if (!state) return;
   if (!state.days) state.days = {};
@@ -589,7 +589,7 @@ function applyRemote(): void {
     writeLocal(state);
     logEvent('apply', 'merged remote changes into local');
     if (onRemoteCb) onRemoteCb();
-    if (!pushInFlight || Date.now() - lastFlushTs > 700) {
+    if (!confirmedPush && (!pushInFlight || Date.now() - lastFlushTs > 700)) {
       markDirty();
       retryFlush();
     }
@@ -739,7 +739,9 @@ function flush(): Promise<boolean> {
     syncError = null;
     touch();
     if (confirmTimer) clearTimeout(confirmTimer);
-    confirmTimer = setTimeout(confirmPush, 1500);
+    // A server echo may already have confirmed this write. Otherwise verify on
+    // the next turn, after flushing clears, without adding a fixed UI delay.
+    if (pushInFlight) confirmTimer = setTimeout(confirmPush, 0);
     logEvent('flush-ok', '');
     notifyStatus();
   }).catch((e: any) => {
@@ -882,10 +884,12 @@ function startListeners(): void {
   unsubs.push(openDoc.onSnapshot({ includeMetadataChanges: true }, (snap: any) => {
     delete listenerErrors['open'];
     remoteOpenDays = snap.exists && snap.data() && snap.data().days ? snap.data().days as Record<string, DayShape> : {};
+    let confirmedPush = false;
     updatePending('open', !!(snap.metadata && snap.metadata.hasPendingWrites));
     if (!(snap.metadata && snap.metadata.fromCache)) touch();
     if (pushInFlight && !(snap.metadata && snap.metadata.fromCache) && !(snap.metadata && snap.metadata.hasPendingWrites)) {
       if (fingerprint(remoteOpenDays) === pushInFlight.fg) {
+        confirmedPush = true;
         pushInFlight = null;
         updatePending('open', false);
         syncDesync = false;
@@ -909,7 +913,9 @@ function startListeners(): void {
     logEvent('snapshot-open', Object.keys(remoteOpenDays).length + ' days' +
       ((snap.metadata && snap.metadata.hasPendingWrites) ? ' (local)' : '') +
       ((snap.metadata && snap.metadata.fromCache) ? ' (cache)' : ''));
-    applyRemote();
+    // Merging our own acknowledged timestamps must not enqueue another write.
+    applyRemote(confirmedPush);
+    notifyStatus();
   }, (err: any) => {
     listenerFailed('open', err);
   }));

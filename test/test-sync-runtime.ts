@@ -29,7 +29,8 @@ function harness() {
     }
   };
   let timerId = 0;
-  const context: any = { console, module: { exports: {} }, exports: {}, window: {}, localStorage: storage, Logic: require('../../dist/logic.js'), navigator: { onLine: true }, Date: class extends Date { static now() { return now; } }, setTimeout: () => ++timerId, clearTimeout() {}, setInterval: () => ++timerId };
+  const timers = new Map<number, { fn: () => void; delay: number }>();
+  const context: any = { console, module: { exports: {} }, exports: {}, window: {}, localStorage: storage, Logic: require('../../dist/logic.js'), navigator: { onLine: true }, Date: class extends Date { static now() { return now; } }, setTimeout: (fn: () => void, delay: number) => { timers.set(++timerId, { fn, delay }); return timerId; }, clearTimeout: (id: number) => timers.delete(id), setInterval: () => ++timerId };
   const code = fs.readFileSync('dist/sync.js', 'utf8');
   const end = code.lastIndexOf('})();');
   const hooks = `
@@ -42,12 +43,31 @@ function harness() {
   vm.runInNewContext(code.slice(0, end) + hooks + code.slice(end), context);
   const runtime = context.runtime;
   runtime.setup(db, open, meta, archive);
-  return { runtime, commits, listeners, snapshot, read: (value: any) => { nextRead = value; }, advance: (ms: number) => { now += ms; }, edit() { const state = JSON.parse(storage.getItem('daily-fresh-state-v2')!); state.days['2026-10-31'].note += 'new edit'; storage.setItem('daily-fresh-state-v2', JSON.stringify(state)); runtime.onLocalChange(); } };
+  return { runtime, commits, listeners, snapshot, timers, serverSnapshot: () => snapshot(serverDays), api: context.window.Sync, read: (value: any) => { nextRead = value; }, advance: (ms: number) => { now += ms; }, edit() { const state = JSON.parse(storage.getItem('daily-fresh-state-v2')!); state.days['2026-10-31'].note += 'new edit'; storage.setItem('daily-fresh-state-v2', JSON.stringify(state)); runtime.onLocalChange(); } };
 }
 
 async function run() {
   let passed = 0;
   async function check(name: string, fn: () => Promise<void>) { await fn(); passed++; console.log('  ok ' + name); }
+  await check('confirmation starts without a fixed delay after a successful write', async () => {
+    const h = harness(); h.edit(); const writing = h.runtime.flush();
+    h.commits[0].resolve(); await writing;
+    const confirmation = [...h.timers.values()].find((timer) => timer.delay === 0);
+    assert.ok(confirmation, 'confirmation should run on the next event loop turn');
+    confirmation!.fn(); await new Promise(setImmediate);
+    assert.equal(h.runtime.currentStatus().state, 'synced');
+  });
+  await check('a matching server echo updates the UI immediately and skips the extra read', async () => {
+    const h = harness(); h.runtime.startListeners();
+    let displayed = '';
+    h.api.onStatus(() => { displayed = h.runtime.currentStatus().state; });
+    h.edit(); const writing = h.runtime.flush();
+    h.commits[0].resolve(); await writing;
+    assert.equal(displayed, 'pending');
+    h.listeners.open.next(h.serverSnapshot());
+    assert.equal(displayed, 'synced', 'notify after clearing the in-flight push');
+    assert.equal([...h.timers.values()].some((timer) => timer.delay === 0), false);
+  });
   await check('a slow unacknowledged write never declares divergence', async () => {
     const h = harness(); h.edit(); const writing = h.runtime.flush(); h.advance(20000); h.runtime.checkSyncStatus();
     assert.equal(h.runtime.inspect().syncDesync, false); assert.equal(h.runtime.currentStatus().state, 'pending');
