@@ -48,6 +48,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 interface LogicApi {
+  stampLocalChanges(state: AppState, previous: AppState, now: number): void;
   pad(n: number): string;
   currentMonth(now?: Date): { y: number; m: number };
   calKey(y: number, m: number, d: number): string;

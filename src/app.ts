@@ -8,6 +8,7 @@
   var APP_VERSION = 'v109';
 
   var state: AppState = load();
+  var savedState: AppState = JSON.parse(JSON.stringify(state));
   var activeDay = state.activeDay || currentDayKey();
   var currentView = 'today';
   var doneOpen = false;
@@ -17,7 +18,6 @@
   var editDayKey: string | null = null;
   var editOpenAt = 0;
   var toastTimer: number | null = null;
-  var noteSaveTimer: number | null = null;
   var calView = currentMonth();
   var lastGreeting = '';
 
@@ -82,8 +82,10 @@
 
   function save() {
     try {
+      Logic.stampLocalChanges(state, savedState, Date.now());
       var json = JSON.stringify(state);
       localStorage.setItem(STORAGE_KEY, json);
+      savedState = JSON.parse(json);
       rotateBackups(json);
     } catch (e) {}
     if (window.Sync && window.Sync.onLocalChange) window.Sync.onLocalChange();
@@ -91,6 +93,7 @@
 
   function reloadFromDisk() {
     state = load();
+    savedState = JSON.parse(JSON.stringify(state));
     activeDay = state.activeDay || currentDayKey();
     if (!state.days[activeDay]) state.days[activeDay] = newDayObj();
     ensureDay(true);
@@ -1314,14 +1317,12 @@
 
   els.noteInput.addEventListener('input', function () {
     today().note = els.noteInput.value;
-    clearTimeout(noteSaveTimer ?? undefined);
-    noteSaveTimer = setTimeout(save, 350);
+    save();
   });
 
   els.reflectionInput.addEventListener('input', function () {
     today().reflection = els.reflectionInput.value;
-    clearTimeout(noteSaveTimer ?? undefined);
-    noteSaveTimer = setTimeout(save, 350);
+    save();
   });
 
   /* ================= History events ================= */

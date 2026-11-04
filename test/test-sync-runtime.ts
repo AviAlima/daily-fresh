@@ -43,7 +43,7 @@ function harness() {
   vm.runInNewContext(code.slice(0, end) + hooks + code.slice(end), context);
   const runtime = context.runtime;
   runtime.setup(db, open, meta, archive);
-  return { runtime, commits, listeners, snapshot, timers, serverSnapshot: () => snapshot(serverDays), api: context.window.Sync, read: (value: any) => { nextRead = value; }, advance: (ms: number) => { now += ms; }, edit() { const state = JSON.parse(storage.getItem('daily-fresh-state-v2')!); state.days['2026-10-31'].note += 'new edit'; storage.setItem('daily-fresh-state-v2', JSON.stringify(state)); runtime.onLocalChange(); } };
+  return { runtime, commits, listeners, snapshot, timers, serverSnapshot: () => snapshot(serverDays), local: () => JSON.parse(storage.getItem('daily-fresh-state-v2')!), api: context.window.Sync, read: (value: any) => { nextRead = value; }, advance: (ms: number) => { now += ms; }, edit() { const state = JSON.parse(storage.getItem('daily-fresh-state-v2')!); const previous = JSON.parse(JSON.stringify(state)); state.days['2026-10-31'].note += 'new edit'; context.Logic.stampLocalChanges(state, previous, now); storage.setItem('daily-fresh-state-v2', JSON.stringify(state)); runtime.onLocalChange(); } };
 }
 
 async function run() {
@@ -116,6 +116,18 @@ async function run() {
   await check('a write completing after unpair cannot revive sync', async () => {
     const h = harness(); h.edit(); const writing = h.runtime.flush(); h.runtime.unpair(); h.commits[0].resolve(); await writing;
     assert.equal(h.runtime.currentStatus().state, 'off'); assert.equal(h.runtime.inspect().dirty, false);
+  });
+  await check('an acknowledged older push cannot erase the next queued local edit', async () => {
+    const h = harness(); h.runtime.startListeners(); h.edit();
+    const first = h.runtime.flush(); h.advance(1); h.edit();
+    h.commits[0].resolve(); await first;
+    h.listeners.open.next(h.serverSnapshot());
+    assert.equal(h.local().days['2026-10-31'].note, 'new editnew edit');
+    assert.equal(h.runtime.currentStatus().state, 'pending');
+    const second = h.runtime.flush(); h.commits[1].resolve(); await second;
+    h.listeners.open.next(h.serverSnapshot());
+    assert.equal(h.local().days['2026-10-31'].note, 'new editnew edit');
+    assert.equal(h.runtime.currentStatus().state, 'synced');
   });
   console.log(passed + ' sync runtime checks passed');
 }

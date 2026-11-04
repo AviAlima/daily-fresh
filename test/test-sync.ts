@@ -545,4 +545,31 @@ check('keeps tie orderTs when arrays match', () => {
   assert.equal(doc.orderTs, 1000);
 });
 
+check('a delayed server echo preserves a newer local edit and unrelated remote fields', () => {
+  const previous = st({ days: { '2026-10-31': day({ tasks: [T('a', 'original', { text: 100, done: 100 })] }) } });
+  const local: AppState = JSON.parse(JSON.stringify(previous));
+  local.days['2026-10-31'].tasks[0].text = 'first edit';
+  (global as any).Logic.stampLocalChanges(local, previous, 200);
+  const first = S.pushDay(local.days['2026-10-31'], previous.days['2026-10-31'], 500);
+  assert.equal(first.tasks[0].ts!.text, 200, 'sending must preserve the edit time');
+  const saved: AppState = JSON.parse(JSON.stringify(local));
+  local.days['2026-10-31'].tasks[0].text = 'second edit';
+  (global as any).Logic.stampLocalChanges(local, saved, 200);
+  first.tasks[0].done = true; first.tasks[0].ts!.done = 300;
+  const merged = S.mergeDay(local.days['2026-10-31'], first).day;
+  assert.equal(merged.tasks[0].text, 'second edit');
+  assert.equal(merged.tasks[0].done, true, 'independent remote changes still merge');
+  assert.equal(merged.tasks[0].ts!.text, 201, 'same-millisecond edits remain ordered');
+});
+check('offline note and settings timestamps survive a delayed upload', () => {
+  const previous = st({ days: { '2026-10-31': day({ note: 'old' }) } });
+  const local: AppState = JSON.parse(JSON.stringify(previous));
+  local.days['2026-10-31'].note = 'offline note'; local.settings.name = 'new name';
+  (global as any).Logic.stampLocalChanges(local, previous, 200);
+  const pushed = S.pushDay(local.days['2026-10-31'], previous.days['2026-10-31'], 900);
+  assert.equal(pushed.fieldTs.note, 200);
+  assert.equal(S.readLocalMeta(local, 900, rm({})).nameTs, 200);
+  const merged = S.mergeDay(local.days['2026-10-31'], day({ note: 'older echo', fieldTs: { note: 100 } }));
+  assert.equal(merged.day.note, 'offline note');
+});
 console.log(pass + ' checks passed');

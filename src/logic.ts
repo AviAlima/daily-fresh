@@ -1,4 +1,40 @@
 (function () {
+  // Record edits before any asynchronous upload or incoming server snapshot.
+  // The previous state is the last local save/remote merge, not a server clock.
+  function stampLocalChanges(state: AppState, previous: AppState, now: number): void {
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    const next = (a = 0, b = 0) => Math.max(now, a + 1, b + 1);
+    const fields = ['text', 'done', 'estimate', 'carriedFrom', 'order'] as const;
+    Object.keys(state.days).forEach(key => {
+      const day = state.days[key], before = previous.days[key];
+      const oldTasks = new Map((before?.tasks || []).map(task => [task.id, task]));
+      day.tasks.forEach(task => {
+        const old = oldTasks.get(task.id);
+        if (!task.ts) task.ts = {};
+        fields.forEach(field => {
+          if (!old || !same(task[field], old[field])) {
+            task.ts![field] = next(task.ts![field], old?.ts?.[field]);
+          }
+        });
+      });
+      if (!day.fieldTs) day.fieldTs = {};
+      (['note', 'focus', 'reflection'] as const).forEach(field => {
+        if (!same(day[field], before?.[field])) day.fieldTs[field] = next(day.fieldTs[field], before?.fieldTs?.[field]);
+      });
+      if (!same(day.tasks.map(t => t.id), before?.tasks.map(t => t.id))) {
+        day.orderTs = next(day.orderTs, before?.orderTs);
+      }
+      (day.tombstones || []).forEach(tombstone => {
+        if (before?.tombstones?.some(t => t.id === tombstone.id && t.deletedAt === tombstone.deletedAt)) return;
+        const old = oldTasks.get(tombstone.id);
+        tombstone.deletedAt = Math.max(tombstone.deletedAt, now, ...Object.values(old?.ts || {}).map(ts => ts + 1));
+      });
+    });
+    if (state.settings.name !== previous.settings.name) state.nameTs = next(state.nameTs, previous.nameTs);
+    if (state.settings.resetHour !== previous.settings.resetHour) state.resetHourTs = next(state.resetHourTs, previous.resetHourTs);
+    if (!same(state.tomorrow || [], previous.tomorrow || [])) state.tomorrowTs = next(state.tomorrowTs, previous.tomorrowTs);
+  }
+
   function pad(n: number) { return n < 10 ? '0' + n : '' + n; }
 
   function currentMonth(now?: Date) {
@@ -284,6 +320,7 @@
   const root: any = typeof window !== 'undefined' ? window : global;
 
   root.Logic = {
+    stampLocalChanges,
     pad,
     currentMonth,
     calKey,

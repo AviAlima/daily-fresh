@@ -640,7 +640,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
       if (rt && deepEq(t[f], rt[f])) {
         ts[f] = Math.max(ts[f] || 0, (rt.ts && rt.ts[f]) || 0);
       } else {
-        ts[f] = now;
+        ts[f] = ts[f] || now;
       }
     });
     const out = cloneTask(t);
@@ -661,7 +661,7 @@ function pushDay(day: DayShape, remote: DayShape | null, now: number): DayShape 
     if (remote && deepEq(day[f] || '', remote[f] || '')) {
       doc.fieldTs[f] = Math.max(doc.fieldTs[f] || 0, (remote.fieldTs && remote.fieldTs[f]) || 0);
     } else {
-      doc.fieldTs[f] = now;
+      doc.fieldTs[f] = doc.fieldTs[f] || now;
     }
   });
   return doc;
@@ -686,7 +686,7 @@ function readLocalMeta(state: AppState, now: number, rm?: RemoteMeta | null): Re
     lm.nameTs = rm.nameTs || 0;
   } else {
     lm.name = localName;
-    lm.nameTs = now;
+    lm.nameTs = state.nameTs || now;
   }
   const localReset = (state.settings && typeof state.settings.resetHour === 'number') ? state.settings.resetHour : 0;
   if (rm && typeof rm.resetHour === 'number' && rm.resetHour === localReset) {
@@ -694,7 +694,7 @@ function readLocalMeta(state: AppState, now: number, rm?: RemoteMeta | null): Re
     lm.resetHourTs = rm.resetHourTs || 0;
   } else {
     lm.resetHour = localReset;
-    lm.resetHourTs = now;
+    lm.resetHourTs = state.resetHourTs || now;
   }
   const localTomorrow = (state.tomorrow || []).map((t) => { return { id: t.id, text: t.text }; });
   const remoteTomorrow = (rm && rm.tomorrow || []).map((t) => { return { id: t.id, text: t.text }; });
@@ -703,7 +703,7 @@ function readLocalMeta(state: AppState, now: number, rm?: RemoteMeta | null): Re
     lm.tomorrowTs = rm.tomorrowTs || 0;
   } else {
     lm.tomorrow = localTomorrow;
-    lm.tomorrowTs = now;
+    lm.tomorrowTs = state.tomorrowTs || now;
   }
   return lm;
 }
