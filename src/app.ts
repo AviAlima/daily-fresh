@@ -20,6 +20,20 @@
   var toastTimer: number | null = null;
   var calView = currentMonth();
   var lastGreeting = '';
+  var rowMarkup = new WeakMap<HTMLElement, string>();
+  var motionPreference = true;
+  try { motionPreference = localStorage.getItem('daily-fresh-motion') !== 'false'; } catch (e) {}
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function motionEnabled() { return motionPreference && !reducedMotion.matches; }
+  function applyMotion() {
+    document.documentElement.dataset.motion = motionEnabled() ? 'on' : 'off';
+    if (!motionEnabled()) {
+      document.querySelectorAll('.task').forEach(function (row) { row.getAnimations().forEach(function (animation) { animation.cancel(); }); });
+      Object.keys(celebratingTasks).forEach(function (key) { delete celebratingTasks[key]; });
+    }
+  }
+  applyMotion();
+  reducedMotion.addEventListener('change', function () { applyMotion(); renderToday(); });
 
   /* ================= Storage ================= */
 
@@ -204,11 +218,11 @@
     if (task.done) {
       var celebrationKey = activeDay + '|' + id;
       var celebrationToken = Date.now();
-      celebratingTasks[celebrationKey] = celebrationToken;
+      if (motionEnabled()) celebratingTasks[celebrationKey] = celebrationToken;
       var completionRow = Array.prototype.find.call(document.querySelectorAll('.task[data-id]'), function (el: HTMLElement) {
         return el.dataset.id === id;
       }) as HTMLElement | undefined;
-      if (completionRow) {
+      if (completionRow && motionEnabled()) {
         completionRow.classList.add('done', 'completing');
         var completionCheck = completionRow.querySelector<HTMLElement>('[data-check]');
         if (completionCheck) {
@@ -542,7 +556,9 @@
   // Tactile feedback: real vibration where the API exists (Android/desktop),
   // a short low-frequency tick on iOS Safari (no vibrate API there).
   function haptic(ms: number) {
+    if (!motionEnabled()) return;
     if (navigator.vibrate) { navigator.vibrate(ms); return; }
+    if (!soundOn()) return;
     try {
       var ctx = ensureAudio();
       if (!ctx) return;
@@ -763,7 +779,45 @@
       '<div class="dash-bars">' + bars + '</div>';
   }
 
+  function renderTaskRows(list: HTMLElement, tasks: TaskShape[]) {
+    const existing = new Map(Array.from(list.querySelectorAll<HTMLElement>('.task')).map(row => [row.dataset.id, row]));
+    const positions = new Map(Array.from(existing.values()).map(row => [row, row.getBoundingClientRect().top]));
+    const sameDay = list.dataset.day === activeDay;
+    const animate = sameDay && motionEnabled() && currentView === 'today';
+    const keep = new Set(tasks.map(task => task.id));
+    existing.forEach((row, id) => { if (!sameDay || !keep.has(id || '')) row.remove(); });
+    tasks.forEach((task, index) => {
+      const markup = taskHtml(task, activeDay);
+      let row = sameDay ? existing.get(task.id) : undefined;
+      const completing = row?.classList.contains('completing') && !!celebratingTasks[activeDay + '|' + task.id];
+      const isNew = !row;
+      if (!row || (!completing && rowMarkup.get(row) !== markup)) {
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        const replacement = template.content.firstElementChild as HTMLElement;
+        if (row) row.replaceWith(replacement);
+        row = replacement;
+        rowMarkup.set(row, markup);
+      }
+      if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
+      if (animate && !row.classList.contains('completing')) {
+        const previousTop = positions.get(row);
+        const delta = previousTop === undefined ? 0 : previousTop - row.getBoundingClientRect().top;
+        if (isNew || Math.abs(delta) > 1) {
+          row.getAnimations().forEach(animation => animation.cancel());
+          row.animate(isNew
+            ? [{ opacity: 0, transform: 'translateY(7px)' }, { opacity: 1, transform: 'translateY(0)' }]
+            : [{ transform: 'translateY(' + delta + 'px)' }, { transform: 'translateY(0)' }],
+            { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        }
+      }
+    });
+    list.dataset.day = activeDay;
+  }
+
   function renderToday() {
+    // Remote data can merge immediately; leave the row under the pointer intact.
+    if (dragState) return;
     var day = today();
     var tasks = orderedTasks(day.tasks);
     var open = tasks.filter(function (t) { return !t.done; });
@@ -776,22 +830,8 @@
     renderDash();
 
     var visibleTasks = orderedTasks(open.concat(celebrating));
-    var preservedRows = Array.prototype.slice.call(els.taskList.querySelectorAll('.task.completing')) as HTMLElement[];
-    preservedRows = preservedRows.filter(function (row) {
-      return celebrating.some(function (t) { return t.id === row.dataset.id; });
-    });
-    els.taskList.innerHTML = visibleTasks.map(function (t) {
-      var preserveIndex = preservedRows.findIndex(function (row) { return row.dataset.id === t.id; });
-      return preserveIndex >= 0
-        ? '<li class="completion-preserve-slot" data-completion-slot="' + preserveIndex + '"></li>'
-        : taskHtml(t, activeDay);
-    }).join('');
-    preservedRows.forEach(function (row, index) {
-      var placeholder = els.taskList.querySelector('[data-completion-slot="' + index + '"]');
-      if (placeholder) placeholder.replaceWith(row);
-    });
-
-    els.doneList.innerHTML = done.map(function (t) { return taskHtml(t, activeDay); }).join('');
+    renderTaskRows(els.taskList, visibleTasks);
+    renderTaskRows(els.doneList, done);
     els.doneCount.textContent = done.length ? ' \u00b7 ' + done.length : '';
     var hasDone = done.length > 0;
     els.doneWrap.classList.toggle('hidden', !hasDone);
@@ -1539,6 +1579,14 @@
     var compact = ($('compactToggle') as HTMLInputElement).checked;
     document.documentElement.dataset.compact = String(compact);
     try { localStorage.setItem('daily-fresh-compact', String(compact)); } catch (e) {}
+  });
+
+  ($('motionToggle') as HTMLInputElement).checked = motionPreference;
+  $('motionToggle').addEventListener('change', function () {
+    motionPreference = ($('motionToggle') as HTMLInputElement).checked;
+    try { localStorage.setItem('daily-fresh-motion', String(motionPreference)); } catch (e) {}
+    applyMotion();
+    renderToday();
   });
 
   els.soundToggle.addEventListener('change', function () {

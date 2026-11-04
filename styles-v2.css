@@ -2615,3 +2615,13 @@ html #carryToggle { width: 44px; height: 44px; position: relative; border: 1px s
   .sync-log-card { align-items: stretch; flex-direction: column; gap: 8px; }
   .sync-log-card .settings-actions { width: 100%; }
 }
+
+/* A quiet mode for the whole interface, independent of sound preferences. */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="off"] .check-sparkles { display: none; }

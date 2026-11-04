@@ -114,6 +114,7 @@ async function cleanSeed(page: any) {
   await page.click('#carryToggle');
   await sleep(300);
   await page.click('#carryList [data-carry]');
+  await page.click('#carrySelected');
   await sleep(300);
   const afterCarry = await openTasks(page);
   check('carry moves yesterday chore into today', afterCarry.includes('Yesterday chore'), JSON.stringify(afterCarry));
@@ -161,6 +162,7 @@ async function cleanSeed(page: any) {
   await page.click('#carryToggle');
   await sleep(250);
   await page.click('#carryList [data-carry]');
+  await page.click('#carrySelected');
   await sleep(300);
   await page.click('#taskList .task:has-text("Postponed chore") [data-edit]');
   await sleep(200);
@@ -214,7 +216,7 @@ async function cleanSeed(page: any) {
   await sleep(400);
   const doubledBadge = await page.$eval('#navToday .carry-count', (el: any) => el ? el.textContent : null).catch(() => null);
   check('carry list hides a task already open in today (no bounce)', doubledBadge === null, 'badge=' + doubledBadge);
-  await page.click('#carryAll').catch(() => {});
+  check('bring-all is disabled when no candidates remain', await page.$eval('#carryAll', (button: any) => button.disabled));
   await sleep(300);
   const doubledCount = await page.$$eval('#taskList .task', (els: any[]) => els.filter((e: any) => e.querySelector('.task-text').textContent === 'Doubled task').length);
   check('no duplicate created by bring-all when text already open', doubledCount === 1, 'count=' + doubledCount);
