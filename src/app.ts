@@ -271,6 +271,7 @@
     var task = day && day.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     task.text = text.trim();
+    task.estimate = parseEstimate(task.text);
     save();
     render();
   }
@@ -341,7 +342,7 @@
 
   /* ================= Postpone ================= */
 
-  function postponeTask(id: string, targetKey: string) {
+  function postponeTask(id: string, targetKey: string, editedText?: string) {
     var day = today();
     var idx = day.tasks.findIndex(function (t) { return t.id === id; });
     if (idx === -1) return;
@@ -355,9 +356,9 @@
     var td = dayObj(targetKey);
     var t: TaskShape = {
       id: uid(),
-      text: task.text,
+      text: editedText === undefined ? task.text : editedText,
       done: false,
-      estimate: task.estimate || parseEstimate(task.text),
+      estimate: editedText === undefined ? task.estimate : parseEstimate(editedText),
       carriedFrom: { day: activeDay, id: id },
       created: new Date().toISOString(),
       order: td.tasks.length,
@@ -1202,8 +1203,10 @@
     }
   }
 
-  function closeEdit() {
+  function closeEdit(discard = false) {
     if (!editId) return;
+    var editedTask = state.days[editDayKey || activeDay]?.tasks.find(function (t) { return t.id === editId; });
+    if (!discard && editedTask && els.editText.value.trim() !== editedTask.text && !confirm('Discard your unsaved changes?')) return;
     var closedId = editId;
     var closedDayKey = editDayKey || activeDay;
     editId = null;
@@ -1223,12 +1226,14 @@
 
   function postponeFromEdit(targetKey: string) {
     if (!editId) return;
+    var text = els.editText.value.trim();
+    if (!text) { els.editText.focus(); return; }
     var id = editId;
-    closeEdit();
-    postponeTask(id, targetKey);
+    closeEdit(true);
+    postponeTask(id, targetKey, text);
   }
 
-  els.editClose.addEventListener('click', closeEdit);
+  els.editClose.addEventListener('click', function () { closeEdit(); });
   els.editModal.addEventListener('click', function (e) {
     if (e.target === els.editModal && Date.now() - editOpenAt > 600) closeEdit();
   });
@@ -1239,7 +1244,7 @@
   });
   els.editText.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); els.editSave.click(); }
-    if (e.key === 'Escape') closeEdit();
+    if (e.key === 'Escape') { e.stopPropagation(); closeEdit(); }
   });
   els.editText.addEventListener('input', resizeEditText);
   window.addEventListener('resize', function () { if (editId) resizeEditText(); });
@@ -1265,7 +1270,7 @@
   els.editDeleteBtn.addEventListener('click', function () {
     if (!editId) return;
     var id = editId;
-    closeEdit();
+    closeEdit(true);
     removeTask(id);
   });
 
