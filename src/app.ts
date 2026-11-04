@@ -1762,6 +1762,10 @@
     button.textContent = 'Updating…';
     dismissKeyboard();
     try {
+      var probeUrl = new URL('./index.html', location.href);
+      probeUrl.searchParams.set('_updateCheck', String(Date.now()));
+      var response = await fetch(probeUrl, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error('Update check failed');
       await window.AppUpdates.refresh({
         getRegistration: async function () {
           return navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : undefined;
@@ -1771,13 +1775,14 @@
           var url = new URL(location.href);
           url.searchParams.set('_refresh', String(Date.now()));
           url.searchParams.set('_returnTo', 'update');
+          url.searchParams.set('_previousVersion', APP_VERSION);
           location.replace(url.toString());
         }
       });
     } catch (e) {
       button.disabled = false;
       button.textContent = 'Update';
-      toast('Could not refresh the app. Close it and open it again.');
+      toast('Could not check for an update. Check your connection and try again.');
     }
   });
 
@@ -2439,17 +2444,21 @@
 
   var bootUrl = new URL(location.href);
   var returnToUpdate = bootUrl.searchParams.get('_returnTo') === 'update';
+  var previousVersion = bootUrl.searchParams.get('_previousVersion');
   if (bootUrl.searchParams.has('_refresh')) {
     var cleanUrl = bootUrl;
     cleanUrl.searchParams.delete('_refresh');
     cleanUrl.searchParams.delete('_returnTo');
+    cleanUrl.searchParams.delete('_previousVersion');
     history.replaceState(null, '', cleanUrl.toString());
   }
 
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./dist/sw.js', { updateViaCache: 'none' }).catch(function () {});
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(function (error) {
+        console.warn('Could not register the Daily Fresh service worker', error);
+      });
     });
   }
 
@@ -2460,6 +2469,9 @@
   if (returnToUpdate) {
     requestAnimationFrame(function () {
       $('updateRow').scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (previousVersion) {
+        toast(previousVersion === APP_VERSION ? 'Still on ' + APP_VERSION : 'Updated to ' + APP_VERSION);
+      }
     });
   }
   updateInstallRow();

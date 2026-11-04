@@ -44,8 +44,10 @@ jobs:
       - name: Stage site
         run: |
           mkdir -p "$RUNNER_TEMP/site"
-          cp index.html styles.css styles-v2.css manifest.json "$RUNNER_TEMP/site/"
+          cp index.html styles.css styles-v2.css manifest.json sw.js "$RUNNER_TEMP/site/"
           cp -r dist icons vendor install "$RUNNER_TEMP/site/"
+          VERSION=$(sed -n "s/.*APP_VERSION = '\(v[0-9]*\)'.*/\1/p" src/app.ts)
+          sed -i -E 's#((href|src)="(styles(-v2)?\.css|dist/[^"]+\.js))"#\1?version='"$VERSION"'"#g' "$RUNNER_TEMP/site/index.html"
           touch "$RUNNER_TEMP/site/.nojekyll"
 
       - name: Upload artifact

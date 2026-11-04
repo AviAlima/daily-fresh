@@ -1,4 +1,4 @@
-declare const sw: ServiceWorkerGlobalScope;
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE = 'daily-fresh-v112';
 
@@ -51,7 +51,7 @@ const ASSETS = [
 sw.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(ASSETS))
+      .then((c) => c.addAll(ASSETS.map((asset) => new Request(new URL(asset, sw.registration.scope), { cache: 'reload' }))))
       .then(() => sw.skipWaiting())
   );
 });
@@ -59,7 +59,7 @@ sw.addEventListener('install', (e) => {
 sw.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('daily-fresh-v') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => sw.clients.claim())
   );
 });
@@ -76,6 +76,8 @@ sw.addEventListener('fetch', (e) => {
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== location.origin) return;
 
+  if (url.searchParams.has('_updateCheck')) return;
+
   e.respondWith(
     fetch(req, { cache: 'no-cache' })
       .then((res) => {
@@ -86,11 +88,12 @@ sw.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() => {
-        return caches.match(req).then((m) => {
+        return caches.open(CACHE).then(async (cache) => {
+          const m = (await cache.match(req)) ?? (await cache.match(req, { ignoreSearch: true }));
           if (m) return m;
-          if (req.mode === 'navigate') return caches.match('./index.html');
-          return undefined;
-        }) as Promise<Response>;
+          if (req.mode === 'navigate') return (await cache.match(new URL('./index.html', sw.registration.scope))) ?? Response.error();
+          return Response.error();
+        });
       })
   );
 });
